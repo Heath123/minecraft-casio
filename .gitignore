@@ -1,0 +1,25 @@
+# Build files
+/build-fx
+/build-cg
+/build-cg-push
+/build-em
+/*.g1a
+/*.g3a
+
+# Python bytecode
+ __pycache__/
+
+# Common IDE files
+*.sublime-project
+*.sublime-workspace
+.vscode
+
+.cache
+.cmake
+.idea
+.clangd
+compile_commands.json
+
+/Azur
+/jstest
+/py-env
