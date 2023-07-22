@@ -1,8 +1,7 @@
+#include "render/render_config.h"
+
 #ifndef SMALL3DLIB_H
 #define SMALL3DLIB_H
-
-#define S3L_RESOLUTION_X 1
-#define S3L_RESOLUTION_Y 1
 
 #define S3L_PIXEL_FUNCTION(...)
 
@@ -1951,7 +1950,7 @@ typedef struct
 // uint8_t _S3L_projectedTriangleState = 0; // 0 = normal, 1 = cut, 2 = split
 
 #if S3L_NEAR_CROSS_STRATEGY == 3
-S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
+extern S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
 #endif
 
 extern uint16_t colours[];

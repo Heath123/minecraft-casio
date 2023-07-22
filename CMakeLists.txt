@@ -39,7 +39,7 @@ fxconv_declare_assets(${ASSETS} ${ASSETS_fx} ${ASSETS_cg} WITH_METADATA)
 
 add_executable(minecraft ${SOURCES} ${ASSETS} ${ASSETS_${FXSDK_PLATFORM}})
 target_include_directories(minecraft PRIVATE src/)
-target_compile_options(minecraft PRIVATE -Wall -Wextra -Wno-comment -Wno-unused-parameter -Wno-unused-function -Wno-missing-field-initializers -Wno-unused-variable --std=c++20 -O3 -flto -g)
+target_compile_options(minecraft PRIVATE -Wall -Wextra -Wno-comment -Wno-unused-parameter -Wno-unused-function -Wno-missing-field-initializers -Wno-unused-variable --std=c++20 -O3 -g)
 target_link_libraries(minecraft PRIVATE
   Azur::Azur -lnum LibProf::LibProf Gint::Gint -lm -lstdc++)
 

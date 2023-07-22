@@ -11,15 +11,15 @@ using libnum::num32;
 
 class Player {
 private:
-  vec3 pos;
-  BoundingBox bounds;
   // TODO: World instead
   Chunk& chunk;
 
-  void updateBounds();
 public:
   Player(Chunk &chunk);
   vec3 vel; // TODO: Private?
+  BoundingBox bounds;
+  vec3 pos;
+  void updateBounds();
 
   void setPos(const vec3& newPos);
   void addPos(const vec3& toAdd);
@@ -27,6 +27,8 @@ public:
   void addVel(const vec3& toAdd);
   vec3 getPos() const;
   vec3 getCameraPos() const;
+
+  bool isOnGround() const;
 
   void tick(num32 lrMove, num32 fbMove);
 };

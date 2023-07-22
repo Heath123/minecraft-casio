@@ -3,11 +3,14 @@
 #include "azur/gint/render.h"
 #include "game/entity/player.h"
 #include "game/world/world.h"
+#include "gint/display.h"
 #include "gint/drivers/r61524.h"
 #include <gint/clock.h>
 #include "libprof.h"
+#include "util/boundingBox.h"
 #include <stdio.h>
 #include <time.h>
+#include <gint/kmalloc.h>
 
 prof_t perf_s3l_sort;
 prof_t perf_s3l_project;
@@ -78,6 +81,9 @@ void azrp_print2(int x, int y, int fg, char const *fmt, ...) {
   vsnprintf(str, sizeof str, fmt, args);
   va_end(args);
 
+  int w, h;
+  dsize(str, &gint_font5x7, &w, &h);
+  azrp_rect(x - 1, y - 1, w + 2, h + 2, AZRP_RECT_DARKEN);
   azrp_text_opt(x, y, &gint_font5x7, fg, DTEXT_LEFT, DTEXT_TOP, str, -1);
 }
 
@@ -104,7 +110,7 @@ void draw(void)
     realFPS = fps;
     fps = 0;
   }
-  azrp_print2(1, 10, C_BLACK, "FPS: %d (max 20)", realFPS);
+  azrp_print2(1, 10, C_WHITE, "FPS: %d (max 20)", realFPS);
   // azrp_print_opt(1, 16, &gint_font5x7, C_BLACK, DTEXT_LEFT, DTEXT_TOP, "FPS: %d", realFPS);
 }
 
@@ -174,7 +180,7 @@ void mainLoop(void) {
     S3L_vec3Sub(&toMove, camR);
   if (keydown(KEY_POWER))
     S3L_vec3Add(&toMove, camR);
-  if (keydown(KEY_SHIFT) && !shiftWasPressed)
+  if (keydown(KEY_SHIFT) /*&& !shiftWasPressed*/ && mainPlayer->isOnGround())
     // S3L_vec3Add(&scene.camera.transform.translation, { 0, 80, 0 });
     // mainPlayer->addVel(vec3(0, 0.42, 0));
     mainPlayer->vel.y = 0.42;
@@ -191,9 +197,7 @@ void mainLoop(void) {
   libnum::vec<int, 3> hit_position_int = { 0, 0, 0 };
   libnum::vec<int, 3> hit_normal = { 0, 0, 0 };
 
-  bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 20, hit_position, hit_position_int, hit_normal);
 
-  if (result != 0) {
     // printf("%d %d %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
 
     // selectionBoxModel.transform.translation.x = hit_position_int.x * S3L_F;
@@ -208,34 +212,46 @@ void mainLoop(void) {
     // static S3L_Unit storage[300 * 3];
     // translateModel(baseSelectionBoxModel, selectionBoxModel, storage, hit_position_int.x * S3L_F, hit_position_int.y * S3L_F, hit_position_int.z * S3L_F - 128);
 
-    bool changed = false;
+  bool changed = false;
 
-    static bool lastF1 = false;
-    static bool lastF2 = false;
+  static bool lastF1 = false;
+  static bool lastF2 = false;
 
-    bool F1 = keydown(KEY_F1);
-    bool F2 = keydown(KEY_F2);
+  bool F1 = keydown(KEY_F1);
+  bool F2 = keydown(KEY_F2);
 
+  if ((F1 && !lastF1) || (F2 && !lastF2)) {
+  // if (1) {
+    bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 20, hit_position, hit_position_int, hit_normal);
+    // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
+
+    vec<int, 3> pos;
+    u8 block;
     if (F1 && !lastF1) {
-      chunk->setBlock(hit_position_int.x, hit_position_int.y, hit_position_int.z, 0);
-      changed = true;
+      pos = hit_position_int;
+      block = 0;
+    } else if (F2 && !lastF2) {
+      pos = hit_position_int + hit_normal;
+      block = 2;
     }
 
-    if (F2 && !lastF2) {
-      hit_position_int += hit_normal;
-      chunk->setBlock(hit_position_int.x, hit_position_int.y, hit_position_int.z, 2);
-      changed = true;
-    }
+    vec3 fracPos = vec3(pos.x, pos.y, pos.z);
+    BoundingBox toPlaceBB = BoundingBox(fracPos, fracPos + vec3(1));
+    // mainPlayer->pos.y.v += 1;
+    // mainPlayer->updateBounds();
+    if (!mainPlayer->bounds.intersects(toPlaceBB)) {
+      chunk->setBlock(pos, block);
 
-    lastF1 = keydown(KEY_F1);
-    lastF2 = keydown(KEY_F2);
-
-    if (changed) {
       delete levelModel.triangles;
       delete levelModel.vertices;
       generateMesh(*chunk, levelModel);
     }
+    // mainPlayer->pos.y.v -= 1;
+    // mainPlayer->updateBounds();
   }
+
+  lastF1 = keydown(KEY_F1);
+  lastF2 = keydown(KEY_F2);
 
   u32 total = prof_exec({
     azrp_perf_clear();
@@ -260,7 +276,7 @@ void mainLoop(void) {
     int z = pos.z.ifloor();
     int zFrac = (pos.z * 100).ifloor() % 100;
 
-    azrp_print2(1, 1, C_BLACK, "x: %d.%02d, y: %d.%02d, z: %d.%02d", x, xFrac, y, yFrac, z, zFrac);
+    azrp_print2(1, 1, C_WHITE, "x: %d.%02d, y: %d.%02d, z: %d.%02d", x, xFrac, y, yFrac, z, zFrac);
     azrp_update();
   });
   // azrp_print(0, 16, C_BLACK, "cmdgen: %d", prof_time(azrp_perf_cmdgen));
@@ -291,7 +307,7 @@ void mainLoop(void) {
   frame++;
 }
 
-bool frameCapEnabled = false;
+bool frameCapEnabled = true;
 
 static int callback_tick(volatile int *newFrameNeeded) {
   *newFrameNeeded = 1;
@@ -299,7 +315,7 @@ static int callback_tick(volatile int *newFrameNeeded) {
 }
 
 void runMainLoop(void (*loop)(), int fps) {
-  static volatile int newFrameNeeded = 0;
+  static volatile int newFrameNeeded = 1;
   int t = timer_configure(TIMER_ANY, 1000000 / fps, GINT_CALL(callback_tick, &newFrameNeeded));
   if (t >= 0) timer_start(t);
 
@@ -309,6 +325,7 @@ void runMainLoop(void (*loop)(), int fps) {
     }
     newFrameNeeded = 0;
     loop();
+    // while (1) {}
   }
 }
 
@@ -321,6 +338,15 @@ int main(void) {
   prof_init();
   close(STDOUT_FILENO);
   open_generic(&stdouterr_type, NULL, STDOUT_FILENO);
+
+  size_t extraMemorySize = 5 * 1024 * 1024;
+  static kmalloc_arena_t extra_ram = { 0 };
+	extra_ram.name = "_extra_ram";
+	extra_ram.is_default = true;
+	extra_ram.start = (void*) 0x8c200000;
+	extra_ram.end = (void*) ((uintptr_t) 0x8c200000 + extraMemorySize);
+	kmalloc_init_arena(&extra_ram, true);
+	kmalloc_add_arena(&extra_ram);
 
   printf("Hello world!\n");
 
@@ -338,14 +364,14 @@ int main(void) {
   chunk = new Chunk();
   World* world = new World(*chunk);
   mainPlayer = new Player(*chunk);
-  mainPlayer->setPos(vec3(7, 3, 3.5));
+  mainPlayer->setPos(vec3(5.5, 3.0, 3.5));
   // printf("First: x: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
   // chunk->setBlock(0, 0, 0, 0);
   // printf("2: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
 
-  for (int x = 0; x < 16; x++) {
+  for (int x = 0; x < 48; x++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 16; z++) {
+      for (int z = 0; z < 48; z++) {
         chunk->setBlock(x, y, z, 0);
       }
     }

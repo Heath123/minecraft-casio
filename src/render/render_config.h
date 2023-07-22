@@ -14,7 +14,7 @@
   #define S3L_PERSPECTIVE_CORRECTION 0
 #endif
 
-#define S3L_NEAR (S3L_F / 5)
+#define S3L_NEAR (S3L_F / 8)
 
 #define S3L_USE_WIDER_TYPES 0
 #define S3L_FLAT 1

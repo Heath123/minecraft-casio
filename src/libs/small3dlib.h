@@ -1,6 +1,8 @@
 #ifndef SMALL3DLIB_H
 #define SMALL3DLIB_H
 
+#include <string.h>
+
 /*
   Simple realtime 3D software rasterization renderer. It is fast, focused on
   resource-limited computers, located in a single C header file, with no
@@ -2665,13 +2667,24 @@ uint16_t S3L_sortArrayLength;
 #endif
 
 // // TODO: Use a different number here
-// S3L_Vec4 S3L_projectedVertices[S3L_MAX_TRIANGES_DRAWN * 3];
+S3L_Vec4 S3L_projectedVertices[S3L_MAX_TRIANGES_DRAWN * 3];
+bool S3L_projectedVerticesDone[S3L_MAX_TRIANGES_DRAWN * 3] = {false};
+
 // uint16_t S3L_projectedVerticesLength;
+
+void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength);
 
 void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
   uint8_t vertex, S3L_Mat4 projectionMatrix, S3L_Vec4 *result)
 {
-  uint32_t vertexIndex = model->triangles[triangleIndex * 3 + vertex] * 3;
+  uint32_t vertexIndexNoMul = model->triangles[triangleIndex * 3 + vertex];
+  if (S3L_projectedVerticesDone[vertexIndexNoMul]) {
+    // printf("HIT\n");
+    *result = S3L_projectedVertices[vertexIndexNoMul];
+    return;
+  }
+  // printf("MISS\n");
+  uint32_t vertexIndex = vertexIndexNoMul * 3;
 
   result->x = model->vertices[vertexIndex];
   result->y = model->vertices[vertexIndex + 1];
@@ -2682,6 +2695,11 @@ void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
 
   result->w = result->z;
   /* We'll keep the non-clamped z in w for sorting. */ 
+
+  _S3L_mapProjectedVertexToScreen(result, S3L_F * 0.714074);
+
+  S3L_projectedVertices[vertexIndexNoMul] = *result;
+  S3L_projectedVerticesDone[vertexIndexNoMul] = true;
 }
 
 void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength)
@@ -2719,122 +2737,122 @@ void _S3L_projectTriangle(
   _S3L_projectVertex(model,triangleIndex,2,matrix,&(transformed[2]));
   _S3L_projectedTriangleState = 0;
 
-#if S3L_NEAR_CROSS_STRATEGY == 2 || S3L_NEAR_CROSS_STRATEGY == 3
-  uint8_t infront = 0;
-  uint8_t behind = 0;
-  uint8_t infrontI[3];
-  uint8_t behindI[3];
+// #if S3L_NEAR_CROSS_STRATEGY == 2 || S3L_NEAR_CROSS_STRATEGY == 3
+//   uint8_t infront = 0;
+//   uint8_t behind = 0;
+//   uint8_t infrontI[3];
+//   uint8_t behindI[3];
 
-  for (uint8_t i = 0; i < 3; ++i)
-    if (transformed[i].z < S3L_NEAR)
-    {
-      infrontI[infront] = i;
-      infront++;
-    }
-    else
-    {
-      behindI[behind] = i;
-      behind++;
-    }
+//   for (uint8_t i = 0; i < 3; ++i)
+//     if (transformed[i].z < S3L_NEAR)
+//     {
+//       infrontI[infront] = i;
+//       infront++;
+//     }
+//     else
+//     {
+//       behindI[behind] = i;
+//       behind++;
+//     }
 
-#if S3L_NEAR_CROSS_STRATEGY == 3
-    for (int i = 0; i < 3; ++i)
-      S3L_vec4Init(&(_S3L_triangleRemapBarycentrics[i]));
+// #if S3L_NEAR_CROSS_STRATEGY == 3
+//     for (int i = 0; i < 3; ++i)
+//       S3L_vec4Init(&(_S3L_triangleRemapBarycentrics[i]));
 
-    _S3L_triangleRemapBarycentrics[0].x = S3L_F;
-    _S3L_triangleRemapBarycentrics[1].y = S3L_F;
-    _S3L_triangleRemapBarycentrics[2].z = S3L_F;
-#endif
+//     _S3L_triangleRemapBarycentrics[0].x = S3L_F;
+//     _S3L_triangleRemapBarycentrics[1].y = S3L_F;
+//     _S3L_triangleRemapBarycentrics[2].z = S3L_F;
+// #endif
 
-#define interpolateVertex \
-  S3L_Unit ratio =\
-    ((transformed[be].z - S3L_NEAR) * S3L_F) /\
-    (transformed[be].z - transformed[in].z);\
-  transformed[in].x = transformed[be].x - \
-    ((transformed[be].x - transformed[in].x) * ratio) /\
-      S3L_F;\
-  transformed[in].y = transformed[be].y -\
-    ((transformed[be].y - transformed[in].y) * ratio) /\
-      S3L_F;\
-  transformed[in].z = S3L_NEAR;\
-  if (beI != 0) {\
-    beI->x = (beI->x * ratio) / S3L_F;\
-    beI->y = (beI->y * ratio) / S3L_F;\
-    beI->z = (beI->z * ratio) / S3L_F;\
-    ratio = S3L_F - ratio;\
-    beI->x += (beB->x * ratio) / S3L_F;\
-    beI->y += (beB->y * ratio) / S3L_F;\
-    beI->z += (beB->z * ratio) / S3L_F; }
+// #define interpolateVertex \
+//   S3L_Unit ratio =\
+//     ((transformed[be].z - S3L_NEAR) * S3L_F) /\
+//     (transformed[be].z - transformed[in].z);\
+//   transformed[in].x = transformed[be].x - \
+//     ((transformed[be].x - transformed[in].x) * ratio) /\
+//       S3L_F;\
+//   transformed[in].y = transformed[be].y -\
+//     ((transformed[be].y - transformed[in].y) * ratio) /\
+//       S3L_F;\
+//   transformed[in].z = S3L_NEAR;\
+//   if (beI != 0) {\
+//     beI->x = (beI->x * ratio) / S3L_F;\
+//     beI->y = (beI->y * ratio) / S3L_F;\
+//     beI->z = (beI->z * ratio) / S3L_F;\
+//     ratio = S3L_F - ratio;\
+//     beI->x += (beB->x * ratio) / S3L_F;\
+//     beI->y += (beB->y * ratio) / S3L_F;\
+//     beI->z += (beB->z * ratio) / S3L_F; }
   
-  if (infront == 2)
-  {
-    // shift the two vertices forward along the edge
-    for (uint8_t i = 0; i < 2; ++i)
-    {
-      uint8_t be = behindI[0], in = infrontI[i];
+//   if (infront == 2)
+//   {
+//     // shift the two vertices forward along the edge
+//     for (uint8_t i = 0; i < 2; ++i)
+//     {
+//       uint8_t be = behindI[0], in = infrontI[i];
 
-#if S3L_NEAR_CROSS_STRATEGY == 3
-      S3L_Vec4 *beI = &(_S3L_triangleRemapBarycentrics[in]),
-               *beB = &(_S3L_triangleRemapBarycentrics[be]);
-#else
-      S3L_Vec4 *beI = 0, *beB = 0;
-#endif
+// #if S3L_NEAR_CROSS_STRATEGY == 3
+//       S3L_Vec4 *beI = &(_S3L_triangleRemapBarycentrics[in]),
+//                *beB = &(_S3L_triangleRemapBarycentrics[be]);
+// #else
+//       S3L_Vec4 *beI = 0, *beB = 0;
+// #endif
 
-      interpolateVertex
+//       interpolateVertex
 
-      _S3L_projectedTriangleState = 1;
-    }
-  }
-  else if (infront == 1)
-  {
-    // create another triangle and do the shifts
-    transformed[3] = transformed[behindI[1]];
-    transformed[4] = transformed[infrontI[0]];
-    transformed[5] = transformed[infrontI[0]];
+//       _S3L_projectedTriangleState = 1;
+//     }
+//   }
+//   else if (infront == 1)
+//   {
+//     // create another triangle and do the shifts
+//     transformed[3] = transformed[behindI[1]];
+//     transformed[4] = transformed[infrontI[0]];
+//     transformed[5] = transformed[infrontI[0]];
 
-#if S3L_NEAR_CROSS_STRATEGY == 3
-    _S3L_triangleRemapBarycentrics[3] =
-      _S3L_triangleRemapBarycentrics[behindI[1]];
-    _S3L_triangleRemapBarycentrics[4] =
-      _S3L_triangleRemapBarycentrics[infrontI[0]];
-    _S3L_triangleRemapBarycentrics[5] =
-      _S3L_triangleRemapBarycentrics[infrontI[0]];
-#endif
+// #if S3L_NEAR_CROSS_STRATEGY == 3
+//     _S3L_triangleRemapBarycentrics[3] =
+//       _S3L_triangleRemapBarycentrics[behindI[1]];
+//     _S3L_triangleRemapBarycentrics[4] =
+//       _S3L_triangleRemapBarycentrics[infrontI[0]];
+//     _S3L_triangleRemapBarycentrics[5] =
+//       _S3L_triangleRemapBarycentrics[infrontI[0]];
+// #endif
 
-    for (uint8_t i = 0; i < 2; ++i)
-    {
-      uint8_t be = behindI[i], in = i + 4;
+//     for (uint8_t i = 0; i < 2; ++i)
+//     {
+//       uint8_t be = behindI[i], in = i + 4;
 
-#if S3L_NEAR_CROSS_STRATEGY == 3
-      S3L_Vec4 *beI = &(_S3L_triangleRemapBarycentrics[in]),
-               *beB = &(_S3L_triangleRemapBarycentrics[be]);
-#else
-      S3L_Vec4 *beI = 0, *beB = 0;
-#endif
+// #if S3L_NEAR_CROSS_STRATEGY == 3
+//       S3L_Vec4 *beI = &(_S3L_triangleRemapBarycentrics[in]),
+//                *beB = &(_S3L_triangleRemapBarycentrics[be]);
+// #else
+//       S3L_Vec4 *beI = 0, *beB = 0;
+// #endif
 
-      interpolateVertex
-    }
+//       interpolateVertex
+//     }
 
-#if S3L_NEAR_CROSS_STRATEGY == 3
-    _S3L_triangleRemapBarycentrics[infrontI[0]] = 
-      _S3L_triangleRemapBarycentrics[4];
-#endif
+// #if S3L_NEAR_CROSS_STRATEGY == 3
+//     _S3L_triangleRemapBarycentrics[infrontI[0]] = 
+//       _S3L_triangleRemapBarycentrics[4];
+// #endif
 
-    transformed[infrontI[0]] = transformed[4];
+//     transformed[infrontI[0]] = transformed[4];
 
-    _S3L_mapProjectedVertexToScreen(&transformed[3],focalLength);
-    _S3L_mapProjectedVertexToScreen(&transformed[4],focalLength);
-    _S3L_mapProjectedVertexToScreen(&transformed[5],focalLength);
+//     _S3L_mapProjectedVertexToScreen(&transformed[3],focalLength);
+//     _S3L_mapProjectedVertexToScreen(&transformed[4],focalLength);
+//     _S3L_mapProjectedVertexToScreen(&transformed[5],focalLength);
 
-    _S3L_projectedTriangleState = 2;
-  }
+//     _S3L_projectedTriangleState = 2;
+//   }
 
-#undef interpolateVertex
-#endif // S3L_NEAR_CROSS_STRATEGY == 2
+// #undef interpolateVertex
+// #endif // S3L_NEAR_CROSS_STRATEGY == 2
 
-  _S3L_mapProjectedVertexToScreen(&transformed[0],focalLength);
-  _S3L_mapProjectedVertexToScreen(&transformed[1],focalLength);
-  _S3L_mapProjectedVertexToScreen(&transformed[2],focalLength);
+  // _S3L_mapProjectedVertexToScreen(&transformed[0],focalLength);
+  // _S3L_mapProjectedVertexToScreen(&transformed[1],focalLength);
+  // _S3L_mapProjectedVertexToScreen(&transformed[2],focalLength);
 
   prof_leave(perf_s3l_project);
 }
@@ -2883,6 +2901,8 @@ static void quicksort(_S3L_TriangleToSort* arr, int16_t low, int16_t high)
 
 void S3L_drawScene(S3L_Scene scene)
 {
+  memset(S3L_projectedVerticesDone, 0, sizeof(S3L_projectedVerticesDone));
+
   S3L_Mat4 matFinal, matCamera;
   S3L_Vec4 transformed[6]; // transformed triangle coords, for 2 triangles
 

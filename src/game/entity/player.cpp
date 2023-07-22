@@ -1,6 +1,7 @@
 #include "player.h"
 #include "game/world/chunk.h"
 #include "util/boundingBox.h"
+#include "util/numConsts.h"
 #include <cstdio>
 
 const num32 PLAYER_HEIGHT = 1.8;
@@ -17,51 +18,69 @@ Player::Player(Chunk &chunk) : bounds(vec3(0), vec3(0)), chunk(chunk) {
 }
 
 void Player::tick(num32 lrMove, num32 fbMove) {
+  // BoundingBox bb = chunk.getBlockBB(5, 4, 9);
+  // num32 dist = bounds.distanceToIntersection(100, Axis::AXIS_Z, bb);
+
+  // TODO: This is the other way around?
+  // pos.z += dist;
+
+  num32 dist = chunk.distanceToIntersection(100, Axis::AXIS_Z, bounds);
+  printf("dist %d\n", (dist * 100).ifloor());
+
   // TODO: Remove this?
   if (vel.y < -1) {
     vel.y = -1;
   }
 
-  // printf("Before: x: %d, y: %d, z: %d", pos.x.ifloor(), pos.y.ifloor(), pos.z.ifloor());
-  pos.y.v += 1;
-  updateBounds();
-
   bool wasColliding = chunk.intersects(bounds);
   // printf("Colliding: %d\n", wasColliding);
 
-  // BoundingBox blockBB = chunk.getBlockBB(8, 3, 3);
-  // printf("Colliding2: %d\n", blockBB.intersects(bounds));
-  // if (wasColliding) {
-  //   pos += vel;
-  // } else {
-  
-  // Do this properly with the swept AABB thing
-  pos.x += vel.x;
-  updateBounds();
-  if (chunk.intersects(bounds)) {
-    pos.x -= vel.x;
-    vel.x = 0;
-  }
-
-  pos.z += vel.z;
-  updateBounds();
-  if (chunk.intersects(bounds)) {
-    pos.z -= vel.z;
-    vel.z = 0;
-  }
-
-  pos.y.v -= 1;
-
-  pos.y += vel.y;
-  updateBounds();
-  if (chunk.intersects(bounds)) {
-    if (vel.y < 0) {
-      pos.y = pos.y.ceil();
-    } else {
-      pos.y -= vel.y;
+  if (wasColliding) {
+    pos += vel;
+  } else {
+    // TODO: Do this properly with the swept AABB thing
+    if (vel.x != 0) {
+      num32 dist = chunk.distanceToIntersection(vel.x, Axis::AXIS_X, bounds);
+      if (dist != vel.x) {
+        vel.x = 0;
+      }
+      pos.x += dist;
+      if (dist != 0) {
+        updateBounds();
+      }
     }
-    vel.y = 0;
+
+    if (vel.z != 0) {
+      num32 dist = chunk.distanceToIntersection(vel.z, Axis::AXIS_Z, bounds);
+      if (dist != vel.z) {
+        vel.z = 0;
+      }
+      pos.z += dist;
+      updateBounds();
+    }
+
+    if (vel.y != 0) {
+      num32 dist = chunk.distanceToIntersection(vel.y, Axis::AXIS_Y, bounds);
+      if (dist != vel.y) {
+        vel.y = 0;
+      }
+      pos.y += dist;
+      updateBounds();
+    }
   }
+
+  // for (int i = 0; i < 64; i++) {
+  //   pos.y += (vel.y / 64);
+  //   updateBounds();
+  //   if (chunk.intersects(bounds)) {
+  //     if (vel.y < 0) {
+  //       pos.y = pos.y.ceil();
+  //     } else {
+  //       pos.y -= (vel.y / 64);
+  //     }
+  //     vel.y = 0;
+  //   }
+  // }
 
   vel.y -= 0.08;
   vel.y *= num32(0.98);
@@ -112,4 +131,14 @@ vec3 Player::getPos() const { return pos; }
 
 vec3 Player::getCameraPos() const {
   return pos + vec3(0, CAMERA_HEIGHT, 0);
+}
+
+bool Player::isOnGround() const {
+  BoundingBox tempBounds = bounds;
+
+  vec3 min = tempBounds.getMin();
+  min.y -= num32consts::epsilon;
+  tempBounds.setMin(min);
+
+  return chunk.intersects(tempBounds);
 }

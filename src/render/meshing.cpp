@@ -8,8 +8,8 @@
 S3L_Model3D chunkModel;
 
 
-#define MAX_VERTICES 9000
-#define MAX_TRIANGLES 4000
+#define MAX_VERTICES 9000 * 8
+#define MAX_TRIANGLES 3000 * 8
 
 #define DIRT_BROWN  C_RGB(17, 12, 8)
 // #define DIRT_BROWN2 C_RGB(15, 10, 6)
@@ -277,9 +277,9 @@ void generateMesh(const Chunk& chunk, S3L_Model3D &levelModel) {
   S3L_Index vertIndex = 0;
   S3L_Index triIndex = 0;
 
-  for (int x = 0; x < 16; x++) {
+  for (int x = 0; x < 48; x++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 16; z++) {
+      for (int z = 0; z < 48; z++) {
         genBlock(vertices, triangles, vertIndex, triIndex, chunk, x, y, z);
       }
     }

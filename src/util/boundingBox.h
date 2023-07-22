@@ -2,9 +2,11 @@
 #define BOUNDINGBOX_H
 
 #include "util/util.h"
+#include "util/axis.h"
 
 #include <num/vec.h>
 using libnum::vec3;
+using libnum::num32;
 
 class BoundingBox {
 private:
@@ -21,6 +23,8 @@ public:
   vec3 getMax() const;
 
   bool intersects(const BoundingBox& other) const;
+  void extend(num32 dist, Axis direction);
+  num32 distanceToIntersection(num32 maxDist, Axis direction, const BoundingBox& other) const;
 };
 
 #endif // BOUNDINGBOX_H
