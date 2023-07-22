@@ -43,11 +43,12 @@ prof_t perf_s3l_project;
 
 volatile char* debugOut = (char*) 0xfffff000;
 
+// Prints to the console on the emulator
 ssize_t stdout_write(void *data, void const *buf, size_t size) {
-  for (int i = 0; i < size; i++) {
-    char c = ((const char*) buf)[i];
-    *debugOut = c;
-  }
+  // for (int i = 0; i < size; i++) {
+  //   char c = ((const char*) buf)[i];
+  //   *debugOut = c;
+  // }
   return size;
 }
 
@@ -73,6 +74,7 @@ int fps = 0;
 
 extern font_t gint_font5x7;
 
+// Print in a small font with a translucent background
 void azrp_print2(int x, int y, int fg, char const *fmt, ...) {
   va_list args;
   va_start(args, fmt);
@@ -87,8 +89,9 @@ void azrp_print2(int x, int y, int fg, char const *fmt, ...) {
   azrp_text_opt(x, y, &gint_font5x7, fg, DTEXT_LEFT, DTEXT_TOP, str, -1);
 }
 
-void draw(void)
-{
+bool debugHUD = true;
+
+void draw(void) {
   S3L_newFrame();
   azrp_clear(0x86df);
 
@@ -110,7 +113,9 @@ void draw(void)
     realFPS = fps;
     fps = 0;
   }
-  azrp_print2(1, 10, C_WHITE, "FPS: %d (max 20)", realFPS);
+  if (debugHUD) {
+    azrp_print2(1, 10, C_WHITE, "FPS: %d (max 20)", realFPS);
+  }
   // azrp_print_opt(1, 16, &gint_font5x7, C_BLACK, DTEXT_LEFT, DTEXT_TOP, "FPS: %d", realFPS);
 }
 
@@ -253,6 +258,14 @@ void mainLoop(void) {
   lastF1 = keydown(KEY_F1);
   lastF2 = keydown(KEY_F2);
 
+  static bool lastF3 = false;
+
+  if (keydown(KEY_F3) && !lastF3) {
+    debugHUD = !debugHUD;
+  }
+
+  lastF3 = keydown(KEY_F3);
+
   u32 total = prof_exec({
     azrp_perf_clear();
     perf_s3l_sort = prof_make();
@@ -276,7 +289,9 @@ void mainLoop(void) {
     int z = pos.z.ifloor();
     int zFrac = (pos.z * 100).ifloor() % 100;
 
-    azrp_print2(1, 1, C_WHITE, "x: %d.%02d, y: %d.%02d, z: %d.%02d", x, xFrac, y, yFrac, z, zFrac);
+    if (debugHUD) {
+      azrp_print2(1, 1, C_WHITE, "x: %d.%02d, y: %d.%02d, z: %d.%02d", x, xFrac, y, yFrac, z, zFrac);
+    }
     azrp_update();
   });
   // azrp_print(0, 16, C_BLACK, "cmdgen: %d", prof_time(azrp_perf_cmdgen));
@@ -292,10 +307,10 @@ void mainLoop(void) {
   u32 project = prof_time(perf_s3l_project);
   u32 other = total - (s3l_sort + sort + render + project);
 
-  drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
-  dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
-  dprint(4, 209, C_BLACK, "other: %d", other);
-  r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
+  // drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
+  // dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
+  // dprint(4, 209, C_BLACK, "other: %d", other);
+  // r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
 
   // azrp_render_fragments();
   // azrp_clear_commands();
