@@ -354,14 +354,14 @@ int main(void) {
   close(STDOUT_FILENO);
   open_generic(&stdouterr_type, NULL, STDOUT_FILENO);
 
-  size_t extraMemorySize = 5 * 1024 * 1024;
-  static kmalloc_arena_t extra_ram = { 0 };
-	extra_ram.name = "_extra_ram";
-	extra_ram.is_default = true;
-	extra_ram.start = (void*) 0x8c200000;
-	extra_ram.end = (void*) ((uintptr_t) 0x8c200000 + extraMemorySize);
-	kmalloc_init_arena(&extra_ram, true);
-	kmalloc_add_arena(&extra_ram);
+  // size_t extraMemorySize = 5 * 1024 * 1024;
+  // static kmalloc_arena_t extra_ram = { 0 };
+	// extra_ram.name = "_extra_ram";
+	// extra_ram.is_default = true;
+	// extra_ram.start = (void*) 0x8c200000;
+	// extra_ram.end = (void*) ((uintptr_t) 0x8c200000 + extraMemorySize);
+	// kmalloc_init_arena(&extra_ram, true);
+	// kmalloc_add_arena(&extra_ram);
 
   printf("Hello world!\n");
 
@@ -384,9 +384,9 @@ int main(void) {
   // chunk->setBlock(0, 0, 0, 0);
   // printf("2: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
 
-  for (int x = 0; x < 48; x++) {
+  for (int x = 0; x < 16; x++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 48; z++) {
+      for (int z = 0; z < 16; z++) {
         chunk->setBlock(x, y, z, 0);
       }
     }
