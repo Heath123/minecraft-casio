@@ -2,7 +2,11 @@
 #include "game/world/chunk.h"
 #include "util/boundingBox.h"
 #include "util/numConsts.h"
-#include <cstdio>
+#include "util/angle.h"
+#include <stdio.h>
+
+// TODO: Wrap
+#include "libs/small3dlib-defs.h"
 
 const num32 PLAYER_HEIGHT = 1.8;
 const num32 PLAYER_WIDTH = 0.6;
@@ -14,6 +18,8 @@ Player::Player(Chunk &chunk) : bounds(vec3(0), vec3(0)), chunk(chunk) {
   pos.y = 50;
   pos.z = 0;
 
+  rotation = vec2(0, 0);
+
   updateBounds();
 }
 
@@ -24,13 +30,10 @@ void Player::tick(num32 lrMove, num32 fbMove) {
   // TODO: This is the other way around?
   // pos.z += dist;
 
-  num32 dist = chunk.distanceToIntersection(100, Axis::AXIS_Z, bounds);
-  printf("dist %d\n", (dist * 100).ifloor());
+  // num32 dist = chunk.distanceToIntersection(100, Axis::AXIS_Z, bounds);
+  // printf("dist %d\n", (dist * 100).ifloor());
 
-  // TODO: Remove this?
-  if (vel.y < -1) {
-    vel.y = -1;
-  }
+  // bool forwardPressed = fb
 
   bool wasColliding = chunk.intersects(bounds);
   // printf("Colliding: %d\n", wasColliding);
@@ -86,18 +89,34 @@ void Player::tick(num32 lrMove, num32 fbMove) {
   vel.y *= num32(0.98);
   // printf("After: x: %d, y: %d, z: %d", pos.x.ifloor(), pos.y.ifloor(), pos.z.ifloor());
 
-  num32 impulse = fbMove;
-  num32 slipperiness = 0.6;
+  num32 impulse = fbMove * S3L_cos(rotation.y.ifloor()) + lrMove * S3L_sin(rotation.y.ifloor());
+  impulse /= 512;
+
+  bool onGround = isOnGround();
+  num32 slipperiness;
+  num32 multiplier;
+  if (onGround) {
+    slipperiness = 0.6;
+    multiplier = num32(0.6) / slipperiness;
+    multiplier = multiplier * multiplier * multiplier * /*effectMultiplier*/ 1;
+  } else {
+    slipperiness = 1.0;
+    multiplier = 0.2;
+  }
+
   vel.z *= slipperiness * num32(0.91);
-  vel.z += num32(0.1) * impulse * 1 * /* (num32(0.6) / slipperiness) * (num32(0.6) / slipperiness) * (num32(0.6) / slipperiness) */ 1;
+  vel.z += num32(0.1) * impulse * multiplier;
 
   // int zVel = vel.z.ifloor();
   // int zVelFrac = (vel.z * 100).ifloor() % 100;
   // printf("zVel: %d.%02d\n", zVel, zVelFrac);
 
-  impulse = lrMove;
+  impulse = fbMove * S3L_sin(rotation.y.ifloor()) - lrMove * S3L_cos(rotation.y.ifloor());
+  impulse = -impulse;
+  impulse /= 512;
+
   vel.x *= slipperiness * num32(0.91);
-  vel.x += num32(0.1) * impulse * 1 * /* (num32(0.6) / slipperiness) * (num32(0.6) / slipperiness) * (num32(0.6) / slipperiness) */ 1;
+  vel.x += num32(0.1) * impulse * multiplier;
 }
 
 void Player::updateBounds() {
@@ -125,6 +144,25 @@ void Player::subPos(const vec3& toSub) {
 
 void Player::addVel(const vec3& toAdd) {
   vel += toAdd;
+}
+
+// vec2 wrapRotation(vec2 in) {
+//   in.x %= 512;
+//   in.y %= 512;
+//   return in;
+// }
+
+vec2 Player::getRotation() const {
+  return rotation;
+}
+
+void Player::rotate(const vec2& rotateBy) {
+  rotation += rotateBy;
+  // rotation = wrapRotation(rotation);
+  // Clamp the pitch but wrap the yaw
+  if (rotation.x > deg(90)) rotation.x = deg(90);
+  if (rotation.x < deg(-90)) rotation.x = deg(-90);
+  rotation.y = wrapAngle(rotation.y);
 }
 
 vec3 Player::getPos() const { return pos; }

@@ -1451,10 +1451,10 @@ uint8_t S3L_stencilBuffer[S3L_STENCIL_BUFFER_SIZE];
 // #endif
 // }
 
-// S3L_Unit S3L_cos(S3L_Unit x)
-// {
-//   return S3L_sin(x + S3L_F / 4);
-// }
+S3L_Unit S3L_cos(S3L_Unit x)
+{
+  return S3L_sin(x + S3L_F / 4);
+}
 
 // void S3L_correctBarycentricCoords(S3L_Unit barycentric[3])
 // {

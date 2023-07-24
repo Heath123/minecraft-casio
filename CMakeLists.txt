@@ -20,6 +20,7 @@ set(SOURCES
   src/game/entity/player.cpp
   src/util/boundingBox.cpp
   src/util/libnumToS3L.cpp
+  src/util/angle.cpp
   # ...
 )
 # Shared assets, fx-9860G-only assets and fx-CG-50-only assets

@@ -36,6 +36,7 @@ prof_t perf_s3l_project;
 
 #include "util/libnumToS3L.h"
 #include "game/world/raycast.h"
+#include "util/angle.h"
 
 #define STDIN_FILENO  0
 #define STDOUT_FILENO 1
@@ -45,10 +46,10 @@ volatile char* debugOut = (char*) 0xfffff000;
 
 // Prints to the console on the emulator
 ssize_t stdout_write(void *data, void const *buf, size_t size) {
-  // for (int i = 0; i < size; i++) {
-  //   char c = ((const char*) buf)[i];
-  //   *debugOut = c;
-  // }
+  for (int i = 0; i < size; i++) {
+    char c = ((const char*) buf)[i];
+    *debugOut = c;
+  }
   return size;
 }
 
@@ -137,6 +138,7 @@ bool getVoxel(int x, int y, int z) {
 }
 
 void mainLoop(void) {
+  cleareventflips();
   clearevents();
   if (keydown(KEY_MENU)) {
     gint_osmenu();
@@ -149,42 +151,90 @@ void mainLoop(void) {
   #define speed_mult 15
   // TODO: Acceleration
   // if (state[SDL_SCANCODE_A])
+
+  // if (keydown(KEY_LEFT))
+  //   scene.camera.transform.rotation.y += 1 * speed_mult;
+  // // else if (state[SDL_SCANCODE_D])
+  // if (keydown(KEY_RIGHT))
+  //   scene.camera.transform.rotation.y -= 1 * speed_mult;
+  // // else if (state[SDL_SCANCODE_W])
+  // if (keydown(KEY_UP))
+  //   scene.camera.transform.rotation.x += 1 * speed_mult;
+  // // else if (state[SDL_SCANCODE_S])
+  // if (keydown(KEY_DOWN))
+  //   scene.camera.transform.rotation.x -= 1 * speed_mult;
+
+  // static int leftPressedTime = 0;
+  // if (keydown(KEY_LEFT)) {
+  //   leftPressedTime++;
+  //   if (leftPressedTime == 1) {
+  //     mainPlayer->rotate(vec2(0, 1));
+  //   } else if (leftPressedTime > 3 && leftPressedTime < 7) {
+  //     mainPlayer->rotate(vec2(0, 1));
+  //   } else if (leftPressedTime >= 7 && leftPressedTime < 15) {
+  //     mainPlayer->rotate(vec2(0, 2));
+  //   } else if (leftPressedTime >= 15) {
+  //     mainPlayer->rotate(vec2(0, 3));
+  //   }
+  // } else {
+  //   leftPressedTime = 0;
+  // }
+
+  // static int rightPressedTime = 0;
+  // if (keydown(KEY_RIGHT)) {
+  //   rightPressedTime++;
+  //   if (rightPressedTime == 1) {
+  //     mainPlayer->rotate(vec2(0, -1));
+  //   } else if (rightPressedTime > 3 && rightPressedTime < 7) {
+  //     mainPlayer->rotate(vec2(0, -1));
+  //   } else if (rightPressedTime >= 7 && rightPressedTime < 15) {
+  //     mainPlayer->rotate(vec2(0, -2));
+  //   } else if (rightPressedTime >= 15) {
+  //     mainPlayer->rotate(vec2(0, -3));
+  //   }
+  // } else {
+  //   rightPressedTime = 0;
+  // }
+
+  constexpr num32 increment = deg(5);
+
   if (keydown(KEY_LEFT))
-    scene.camera.transform.rotation.y += 1 * speed_mult;
-  // else if (state[SDL_SCANCODE_D])
+    mainPlayer->rotate(vec2(0, increment));
   if (keydown(KEY_RIGHT))
-    scene.camera.transform.rotation.y -= 1 * speed_mult;
-  // else if (state[SDL_SCANCODE_W])
+    mainPlayer->rotate(vec2(0, -increment));
   if (keydown(KEY_UP))
-    scene.camera.transform.rotation.x += 1 * speed_mult;
-  // else if (state[SDL_SCANCODE_S])
+    mainPlayer->rotate(vec2(increment, 0));
   if (keydown(KEY_DOWN))
-    scene.camera.transform.rotation.x -= 1 * speed_mult;
+    mainPlayer->rotate(vec2(-increment, 0));
 
-  S3L_Vec4 camF, camR;
-  S3L_Vec4 rayDir;
+  vec2 rotation = mainPlayer->getRotation();
+  scene.camera.transform.rotation.y = rotation.y.ifloor();
+  scene.camera.transform.rotation.x = rotation.x.ifloor();
 
-  S3L_rotationToDirections(scene.camera.transform.rotation,S3L_F,&camF,&camR,0);
-  rayDir = camF;
-  camF.y = 0;
-  camR.y = 0;
-  S3L_vec3Normalize(&camF);
-  S3L_vec3Normalize(&camR);
+  // S3L_Vec4 camF, camR;
+  // rayDir = camF;
+  // camF.y = 0;
+  // camR.y = 0;
+  // S3L_vec3Normalize(&camF);
+  // S3L_vec3Normalize(&camR);
   // camF.x /= 4; camF.z /= 4;
   // camR.x /= 4; camR.z /= 4;
 
   static bool shiftWasPressed = keydown(KEY_SHIFT);
 
-  S3L_Vec4 toMove = { 0, 0, 0 };
+  // S3L_Vec4 toMove = { 0, 0, 0 };
+
+  num32 lr = 0;
+  num32 fb = 0;
 
   if (keydown(KEY_OPTN))
-    S3L_vec3Add(&toMove, camF);
+    fb += 1;
   if (keydown(KEY_LOG))
-    S3L_vec3Sub(&toMove, camF);
+    fb -= 1;
   if (keydown(KEY_ALPHA))
-    S3L_vec3Sub(&toMove, camR);
+    lr -= 1;
   if (keydown(KEY_POWER))
-    S3L_vec3Add(&toMove, camR);
+    lr += 1;
   if (keydown(KEY_SHIFT) /*&& !shiftWasPressed*/ && mainPlayer->isOnGround())
     // S3L_vec3Add(&scene.camera.transform.translation, { 0, 80, 0 });
     // mainPlayer->addVel(vec3(0, 0.42, 0));
@@ -194,9 +244,22 @@ void mainLoop(void) {
 
   shiftWasPressed = keydown(KEY_SHIFT);
 
-  vec3 toMove2 = toVec3(toMove);
-  mainPlayer->tick(toMove2.x, toMove2.z);
+  // vec3 toMove2 = toVec3(toMove);
+  mainPlayer->tick(lr, fb);
   scene.camera.transform.translation = toS3L_Vec4(mainPlayer->getCameraPos());
+
+  static num32 fovMult = 1;
+
+  num32 targetFovMult = keydown(KEY_F4) ? 1.15 : 1.0; // mainPlayer->getFOVModifier();
+  fovMult += (targetFovMult - fovMult) / 2;
+  if (fovMult > num32(1.5)) fovMult = 1.5;
+  if (fovMult < num32(0.1)) fovMult = 0.1;
+
+  #define M_PI 3.14159265358979323846
+  float fovf = ((float) fovMult * 70.0) * (M_PI / 180);
+  float mult = 1.0 / (2.0 * tanf(fovf / 2.0));
+  // printf("fov: %d\n", (int) (mult * 1000));
+  scene.camera.focalLength = S3L_F * mult;
 
   libnum::vec3 hit_position = { 0, 0, 0 };
   libnum::vec<int, 3> hit_position_int = { 0, 0, 0 };
@@ -227,7 +290,9 @@ void mainLoop(void) {
 
   if ((F1 && !lastF1) || (F2 && !lastF2)) {
   // if (1) {
-    bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 20, hit_position, hit_position_int, hit_normal);
+    S3L_Vec4 rayDir;
+    S3L_rotationToDirections(scene.camera.transform.rotation, S3L_F, &rayDir, 0, 0);
+    bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 3, hit_position, hit_position_int, hit_normal);
     // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
 
     vec<int, 3> pos;
@@ -275,7 +340,8 @@ void mainLoop(void) {
 
     // Draw the crosshair
     azrp_rect((azrp_width / 2) - 1, (azrp_height / 2) - 5, 2, 10, AZRP_RECT_INVERT);
-    azrp_rect((azrp_width / 2) - 5, (azrp_height / 2) - 1, 10, 2, AZRP_RECT_INVERT);
+    azrp_rect((azrp_width / 2) - 5, (azrp_height / 2) - 1, 4, 2, AZRP_RECT_INVERT);
+    azrp_rect((azrp_width / 2) + 1, (azrp_height / 2) - 1, 4, 2, AZRP_RECT_INVERT);
 
     // mainPlayer->setPos(vec3(0, 50, 0));
     vec3 pos = mainPlayer->getPos();
@@ -402,7 +468,8 @@ int main(void) {
   // makeSelectionBox(baseSelectionBoxModel);
 
   S3L_sceneInit(&models[0], 1, &scene);
-  scene.camera.focalLength = S3L_F * 0.714074; // 70 degrees
+
+  // scene.camera.focalLength = S3L_F * 0.714074; // 70 degrees
 
   runMainLoop(mainLoop, 20);
   return 0;

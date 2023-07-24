@@ -2675,7 +2675,7 @@ bool S3L_projectedVerticesDone[S3L_MAX_TRIANGES_DRAWN * 3] = {false};
 void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength);
 
 void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
-  uint8_t vertex, S3L_Mat4 projectionMatrix, S3L_Vec4 *result)
+  uint8_t vertex, S3L_Mat4 projectionMatrix, S3L_Vec4 *result, S3L_Unit focalLength)
 {
   uint32_t vertexIndexNoMul = model->triangles[triangleIndex * 3 + vertex];
   if (S3L_projectedVerticesDone[vertexIndexNoMul]) {
@@ -2696,7 +2696,7 @@ void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
   result->w = result->z;
   /* We'll keep the non-clamped z in w for sorting. */ 
 
-  _S3L_mapProjectedVertexToScreen(result, S3L_F * 0.714074);
+  _S3L_mapProjectedVertexToScreen(result, focalLength);
 
   S3L_projectedVertices[vertexIndexNoMul] = *result;
   S3L_projectedVerticesDone[vertexIndexNoMul] = true;
@@ -2732,9 +2732,9 @@ void _S3L_projectTriangle(
   S3L_Vec4 transformed[6])
 {
   prof_enter(perf_s3l_project);
-  _S3L_projectVertex(model,triangleIndex,0,matrix,&(transformed[0]));
-  _S3L_projectVertex(model,triangleIndex,1,matrix,&(transformed[1]));
-  _S3L_projectVertex(model,triangleIndex,2,matrix,&(transformed[2]));
+  _S3L_projectVertex(model,triangleIndex,0,matrix,&(transformed[0]), focalLength);
+  _S3L_projectVertex(model,triangleIndex,1,matrix,&(transformed[1]), focalLength);
+  _S3L_projectVertex(model,triangleIndex,2,matrix,&(transformed[2]), focalLength);
   _S3L_projectedTriangleState = 0;
 
 // #if S3L_NEAR_CROSS_STRATEGY == 2 || S3L_NEAR_CROSS_STRATEGY == 3
