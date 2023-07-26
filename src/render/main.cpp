@@ -37,6 +37,7 @@ prof_t perf_s3l_project;
 #include "util/libnumToS3L.h"
 #include "game/world/raycast.h"
 #include "util/angle.h"
+#include "util/colour.h"
 
 #define STDIN_FILENO  0
 #define STDOUT_FILENO 1
@@ -250,7 +251,8 @@ void mainLoop(void) {
 
   static num32 fovMult = 1;
 
-  num32 targetFovMult = keydown(KEY_F4) ? 1.15 : 1.0; // mainPlayer->getFOVModifier();
+  // num32 targetFovMult = keydown(KEY_F4) ? 1.15 : 1.0; // mainPlayer->getFOVModifier();
+  num32 targetFovMult = 1.0;
   fovMult += (targetFovMult - fovMult) / 2;
   if (fovMult > num32(1.5)) fovMult = 1.5;
   if (fovMult < num32(0.1)) fovMult = 0.1;
@@ -288,36 +290,62 @@ void mainLoop(void) {
   bool F1 = keydown(KEY_F1);
   bool F2 = keydown(KEY_F2);
 
-  if ((F1 && !lastF1) || (F2 && !lastF2)) {
-  // if (1) {
-    S3L_Vec4 rayDir;
-    S3L_rotationToDirections(scene.camera.transform.rotation, S3L_F, &rayDir, 0, 0);
-    bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 3, hit_position, hit_position_int, hit_normal);
-    // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
+  // if ((F1 && !lastF1) || (F2 && !lastF2)) {
+  S3L_Vec4 rayDir;
+  S3L_rotationToDirections(scene.camera.transform.rotation, S3L_F, &rayDir, 0, 0);
+  bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 3, hit_position, hit_position_int, hit_normal);
+  if (!result) {
+    hit_position_int = { -1, -1, -1 };
+  }
 
+  static vec<int, 3> lastPos = { -1, -1, -1 };
+  static u16 last_state[12] = { 0 };
+
+  if (lastPos != hit_position_int) {
+    // Rollback the last one if it exists
+    if (lastPos != vec<int, 3>{ -1, -1, -1 }) {
+      colourTris(lastPos.x, lastPos.y, lastPos.z, levelModel, 0, [](u16 col, int index) -> u16 { return last_state[index]; });
+    }
+
+    if (result) {
+      // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
+
+      colourTris(hit_position_int.x, hit_position_int.y, hit_position_int.z, levelModel, last_state, [](u16 col, int index) -> u16 {
+        // Lighten slightly
+        return mix(lighten(col), col);
+      });
+    }
+    lastPos = hit_position_int;
+
+  }
+
+  if (result) {
+    bool shouldChange = false;
     vec<int, 3> pos;
     u8 block;
     if (F1 && !lastF1) {
       pos = hit_position_int;
       block = 0;
+      shouldChange = true;
     } else if (F2 && !lastF2) {
       pos = hit_position_int + hit_normal;
       block = 2;
+      shouldChange = true;
     }
 
-    vec3 fracPos = vec3(pos.x, pos.y, pos.z);
-    BoundingBox toPlaceBB = BoundingBox(fracPos, fracPos + vec3(1));
-    // mainPlayer->pos.y.v += 1;
-    // mainPlayer->updateBounds();
-    if (!mainPlayer->bounds.intersects(toPlaceBB)) {
-      chunk->setBlock(pos, block);
+    if (shouldChange) {
+      vec3 fracPos = vec3(pos.x, pos.y, pos.z);
+      BoundingBox toPlaceBB = BoundingBox(fracPos, fracPos + vec3(1));
+      // mainPlayer->pos.y.v += 1;
+      // mainPlayer->updateBounds();
+      if (!mainPlayer->bounds.intersects(toPlaceBB)) {
+        chunk->setBlock(pos, block);
 
-      delete levelModel.triangles;
-      delete levelModel.vertices;
-      generateMesh(*chunk, levelModel);
+        delete levelModel.triangles;
+        delete levelModel.vertices;
+        generateMesh(*chunk, levelModel);
+      }
     }
-    // mainPlayer->pos.y.v -= 1;
-    // mainPlayer->updateBounds();
   }
 
   lastF1 = keydown(KEY_F1);

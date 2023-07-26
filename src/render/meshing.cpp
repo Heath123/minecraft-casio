@@ -3,6 +3,7 @@
 #include "meshing.h"
 #include "gint/display-cg.h"
 #include "libs/small3dlib-defs.h"
+#include <cstdint>
 #include <cstdio>
 
 S3L_Model3D chunkModel;
@@ -66,28 +67,35 @@ S3L_Index addVertex(S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Unit x, S3L_Un
   return index;
 }
 
-S3L_Index addTriangle(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, color_t col) {
+// TODO: Make these heap allocated like the other two
+u16 colours[MAX_TRIANGLES];
+// This can be binary-searched in order to find triangles corresponding to a block coordinate
+// TODO: Do it per quad instead of per triangle?
+u16 blockCoords[MAX_TRIANGLES] = {UINT16_MAX};
+
+S3L_Index addTriangle(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, color_t col, u16 coord) {
   triangles[(triIndex * 3)] = index1;
   triangles[(triIndex * 3) + 1] = index2;
   triangles[(triIndex * 3) + 2] = index3;
   colours[triIndex] = col;
+  blockCoords[triIndex] = coord;
   S3L_Index index = triIndex;
   triIndex += 1;
   return index;
 }
 
-void addQuad(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, S3L_Index index4, color_t col) {
-  addTriangle(triangles, triIndex, index1, index2, index4, col);
-  addTriangle(triangles, triIndex, index2, index3, index4, col);
+void addQuad(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, S3L_Index index4, color_t col, u16 coord) {
+  addTriangle(triangles, triIndex, index1, index2, index4, col, coord);
+  addTriangle(triangles, triIndex, index2, index3, index4, col, coord);
 }
 
-void addQuadWithVertices(S3L_Index* triangles, S3L_Index &triIndex, S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Vec4 pos1, S3L_Vec4 pos2, S3L_Vec4 pos3, S3L_Vec4 pos4, color_t col) {
+void addQuadWithVertices(S3L_Index* triangles, S3L_Index &triIndex, S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Vec4 pos1, S3L_Vec4 pos2, S3L_Vec4 pos3, S3L_Vec4 pos4, color_t col, u16 coord) {
   S3L_Index a = addVertex(vertices, vertIndex, pos1.x, pos1.y, pos1.z);
   S3L_Index b = addVertex(vertices, vertIndex, pos2.x, pos2.y, pos2.z);
   S3L_Index c = addVertex(vertices, vertIndex, pos3.x, pos3.y, pos3.z);
   S3L_Index d = addVertex(vertices, vertIndex, pos4.x, pos4.y, pos4.z);
 
-  addQuad(triangles, triIndex, a, b, c, d, col);
+  addQuad(triangles, triIndex, a, b, c, d, col, coord);
 }
 
 // Looking towards Z+
@@ -125,6 +133,8 @@ void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3
   // printf("Cube added at %d, %d, %d\n", x, y, z);
   u8 blockID = chunk.getBlock(x, y, z);
   if (!blockID) return;
+
+  u16 coord = (x * 32 * 16) + (y * 16) + z;
 
   // // If it's surrounded in solid blocks then it's invisible
   if (chunk.getBlock(x + 1, y, z) != 0 &&
@@ -214,37 +224,37 @@ void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3
   if (faceVisible.top) {
     // d h
     // c g
-    addQuad(triangles, triIndex, c, g, h, d, vary(blockColours[blockID - 1][0], x, y, z));
+    addQuad(triangles, triIndex, c, g, h, d, vary(blockColours[blockID - 1][0], x, y, z), coord);
   }
 
   if (faceVisible.bottom) {
     // a e
     // b f
-    addQuad(triangles, triIndex, b, f, e, a, vary(blockColours[blockID - 1][1], x, y, z));
+    addQuad(triangles, triIndex, b, f, e, a, vary(blockColours[blockID - 1][1], x, y, z), coord);
   }
 
   if (faceVisible.left) {
     // d c
     // b a
-    addQuad(triangles, triIndex, b, a, c, d, vary(blockColours[blockID - 1][2], x, y, z));
+    addQuad(triangles, triIndex, b, a, c, d, vary(blockColours[blockID - 1][2], x, y, z), coord);
   }
 
   if (faceVisible.right) {
     // g h
     // e f
-    addQuad(triangles, triIndex, e, f, h, g, vary(blockColours[blockID - 1][3], x, y, z));
+    addQuad(triangles, triIndex, e, f, h, g, vary(blockColours[blockID - 1][3], x, y, z), coord);
   }
 
   if (faceVisible.front) {
     // c g
     // a e
-    addQuad(triangles, triIndex, a, e, g, c, vary(blockColours[blockID - 1][4], x, y, z));
+    addQuad(triangles, triIndex, a, e, g, c, vary(blockColours[blockID - 1][4], x, y, z), coord);
   }
 
   if (faceVisible.back) {
     // h d
     // f b
-    addQuad(triangles, triIndex, f, b, d, h, vary(blockColours[blockID - 1][5], x, y, z));
+    addQuad(triangles, triIndex, f, b, d, h, vary(blockColours[blockID - 1][5], x, y, z), coord);
   }
 
   // vertices += vertIndex * 3;
@@ -266,7 +276,46 @@ void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3
   // triIndex += 12;
 }
 
-uint16_t colours[MAX_TRIANGLES];
+int findIndex(u16 coord, S3L_Model3D &levelModel) {
+  int start = 0;
+  int end = levelModel.triangleCount - 1;
+
+  while (start <= end) {
+    int mid = start + (end - start) / 2;
+
+    if (blockCoords[mid] == coord) {
+      return mid; // Found the element, return its index
+    } else if (blockCoords[mid] < coord) {
+      start = mid + 1; // Search the right half
+    } else {
+      end = mid - 1; // Search the left half
+    }
+  }
+
+  return -1;
+}
+
+void colourTris(int x, int y, int z, S3L_Model3D &levelModel, u16* rollback_state, u16 (*effect)(u16 col, int index)) {
+  u16 coord = (x * 32 * 16) + (y * 16) + z;
+  int index = findIndex(coord, levelModel);
+  printf("Index: %d\n", index);
+  if (index != -1) {
+    // The index could be any tri in the block, so step back to find all of them
+    index -= 12;
+    while (blockCoords[index] != coord) {
+      index++;
+    }
+    int i = 0;
+    while (blockCoords[index] == coord) {
+      if (rollback_state != NULL) {
+        rollback_state[i] = colours[index];
+      }
+      colours[index] = effect(colours[index], i);
+      index++;
+      i++;
+    }
+  }
+}
 
 void generateMesh(const Chunk& chunk, S3L_Model3D &levelModel) {
   // printf("1.1");
@@ -302,32 +351,32 @@ void generateMesh(const Chunk& chunk, S3L_Model3D &levelModel) {
 }
 
 void makeSelectionBox(S3L_Model3D &boxModel) {
-  // printf("1.1");
-  S3L_Unit* vertices = new S3L_Unit[300 * 3];
-  // printf("1.2");
-  S3L_Index* triangles = new S3L_Index[100 * 3];
-  // printf("1.3");
-  S3L_Index vertIndex = 0;
-  S3L_Index triIndex = 0;
+  // // printf("1.1");
+  // S3L_Unit* vertices = new S3L_Unit[300 * 3];
+  // // printf("1.2");
+  // S3L_Index* triangles = new S3L_Index[100 * 3];
+  // // printf("1.3");
+  // S3L_Index vertIndex = 0;
+  // S3L_Index triIndex = 0;
 
-  // Left
-  addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {0, 0, 0}, {U / 16, 0, 0}, {U / 16, U, 0}, {0, U, 0}, 0xffff);
-  // Right
-  addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {U - (U / 16), 0, 0}, {U, 0, 0}, {U, U, 0}, {U - (U / 16), U, 0}, 0xffff);
+  // // Left
+  // addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {0, 0, 0}, {U / 16, 0, 0}, {U / 16, U, 0}, {0, U, 0}, 0xffff);
+  // // Right
+  // addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {U - (U / 16), 0, 0}, {U, 0, 0}, {U, U, 0}, {U - (U / 16), U, 0}, 0xffff);
 
-  addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {U / 8, 0, 0}, {U - (U / 8), 0, 0}, {U - (U / 8), U / 16, 0}, {U / 8, U / 16, 0}, 0xffff);
+  // addQuadWithVertices(triangles, triIndex, vertices, vertIndex, {U / 8, 0, 0}, {U - (U / 8), 0, 0}, {U - (U / 8), U / 16, 0}, {U / 8, U / 16, 0}, 0xffff);
 
-  printf("%d verts, %d tris\n", vertIndex, triIndex);
+  // printf("%d verts, %d tris\n", vertIndex, triIndex);
 
-  S3L_model3DInit(
-    vertices,
-    vertIndex,
-    triangles,
-    triIndex,
-    &boxModel);
+  // S3L_model3DInit(
+  //   vertices,
+  //   vertIndex,
+  //   triangles,
+  //   triIndex,
+  //   &boxModel);
   
-  boxModel.config.backfaceCulling = 2;
-  // boxModel.config.alwaysOnTop = 1;
+  // boxModel.config.backfaceCulling = 2;
+  // // boxModel.config.alwaysOnTop = 1;
 }
 
 // Apply the transform to the actual vertex positions
