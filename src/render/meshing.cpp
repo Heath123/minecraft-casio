@@ -298,7 +298,7 @@ int findIndex(u16 coord, S3L_Model3D &levelModel) {
 void colourTris(int x, int y, int z, S3L_Model3D &levelModel, u16* rollback_state, u16 (*effect)(u16 col, int index)) {
   u16 coord = (x * 32 * 16) + (y * 16) + z;
   int index = findIndex(coord, levelModel);
-  printf("Index: %d\n", index);
+  // printf("Index: %d\n", index);
   if (index != -1) {
     // The index could be any tri in the block, so step back to find all of them
     index -= 12;

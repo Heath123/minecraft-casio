@@ -18,7 +18,7 @@
 
 #define S3L_USE_WIDER_TYPES 0
 #define S3L_FLAT 1
-#define S3L_SORT 1
+#define S3L_SORT 0
 #define S3L_Z_BUFFER 0
 #define S3L_COMPUTE_DEPTH 0
 #define S3L_MAX_TRIANGES_DRAWN 2048

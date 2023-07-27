@@ -1657,16 +1657,42 @@ void S3L_transform3DInit(S3L_Transform3D *t)
   t->scale.w = 0;
 }
 
+// https://stackoverflow.com/questions/56207065/creating-a-lookup-table-at-compile-time
+#include <array>
+
+using ResultT = S3L_Unit;
+constexpr ResultT f(int i) {
+  S3L_Unit focalLength = 365;
+  if (i == 0) {
+    return 0;
+  }
+  return (focalLength * 256) / (i * 32);
+}
+
+constexpr auto LUT = [] {
+  constexpr auto LUT_Size = 16384;
+  std::array<ResultT, LUT_Size> arr = {};
+
+  for (int i = 0; i < LUT_Size; i++) {
+    arr[i] = f(i);
+  }
+
+  return arr;
+}();
+
 /** Performs perspecive division (z-divide). Does NOT check for division by
   zero. */
 static inline void S3L_perspectiveDivide(S3L_Vec4 *vector,
   S3L_Unit focalLength)
 {
+  // printf("%d\n", focalLength);
   if (focalLength == 0)
     return;
 
-  vector->x = (vector->x * focalLength) / vector->z;
-  vector->y = (vector->y * focalLength) / vector->z;
+  vector->x = (vector->x * ((focalLength * 256) / vector->z)) / 256;
+  vector->y = (vector->y * ((focalLength * 256) / vector->z)) / 256;
+  // vector->x = (vector->x * LUT[vector->z / 32]) / 256;
+  // vector->y = (vector->y * LUT[vector->z / 32]) / 256;
 }
 
 void S3L_project3DPointToScreen(
@@ -2675,7 +2701,7 @@ bool S3L_projectedVerticesDone[S3L_MAX_TRIANGES_DRAWN * 3] = {false};
 void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength);
 
 void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
-  uint8_t vertex, S3L_Mat4 projectionMatrix, S3L_Vec4 *result, S3L_Unit focalLength)
+  uint8_t vertex, S3L_Scene* scene, S3L_Vec4 *result, S3L_Unit focalLength)
 {
   uint32_t vertexIndexNoMul = model->triangles[triangleIndex * 3 + vertex];
   if (S3L_projectedVerticesDone[vertexIndexNoMul]) {
@@ -2689,9 +2715,14 @@ void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
   result->x = model->vertices[vertexIndex];
   result->y = model->vertices[vertexIndex + 1];
   result->z = model->vertices[vertexIndex + 2];
+  // S3L_vec3Add(result, scene->camera.transform.translation);
+  result->x -= scene->camera.transform.translation.x;
+  result->y -= scene->camera.transform.translation.y;
+  result->z -= scene->camera.transform.translation.z;
+
   result->w = S3L_F; // needed for translation 
  
-  S3L_vec3Xmat4(result,projectionMatrix);
+  // S3L_vec3Xmat4(result,projectionMatrix);
 
   result->w = result->z;
   /* We'll keep the non-clamped z in w for sorting. */ 
@@ -2727,14 +2758,14 @@ void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength)
 void _S3L_projectTriangle(
   const S3L_Model3D *model,
   S3L_Index triangleIndex,
-  S3L_Mat4 matrix,
+  S3L_Scene* scene,
   uint32_t focalLength,
   S3L_Vec4 transformed[6])
 {
   prof_enter(perf_s3l_project);
-  _S3L_projectVertex(model,triangleIndex,0,matrix,&(transformed[0]), focalLength);
-  _S3L_projectVertex(model,triangleIndex,1,matrix,&(transformed[1]), focalLength);
-  _S3L_projectVertex(model,triangleIndex,2,matrix,&(transformed[2]), focalLength);
+  _S3L_projectVertex(model,triangleIndex,0,scene,&(transformed[0]), focalLength);
+  _S3L_projectVertex(model,triangleIndex,1,scene,&(transformed[1]), focalLength);
+  _S3L_projectVertex(model,triangleIndex,2,scene,&(transformed[2]), focalLength);
   _S3L_projectedTriangleState = 0;
 
 // #if S3L_NEAR_CROSS_STRATEGY == 2 || S3L_NEAR_CROSS_STRATEGY == 3
@@ -2956,8 +2987,22 @@ void S3L_drawScene(S3L_Scene scene)
          already projected vertices, but after some testing this was abandoned,
          no gain was seen. */
 
-      _S3L_projectTriangle(model,triangleIndex,matFinal,
-        scene.camera.focalLength,transformed);
+      // _S3L_projectTriangle(model,triangleIndex,matFinal,
+      //   scene.camera.focalLength,transformed);
+
+
+
+
+      _S3L_projectVertex(model,triangleIndex,0,&scene,&(transformed[0]), scene.camera.focalLength);
+      _S3L_projectVertex(model,triangleIndex,1,&scene,&(transformed[1]), scene.camera.focalLength);
+      _S3L_projectVertex(model,triangleIndex,2,&scene,&(transformed[2]), scene.camera.focalLength);
+      _S3L_projectedTriangleState = 0;
+
+
+
+
+
+
 
       if (S3L_triangleIsVisible(transformed[0],transformed[1],transformed[2],
          model->config.backfaceCulling))
