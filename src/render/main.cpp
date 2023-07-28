@@ -96,82 +96,68 @@ void azrp_print2(int x, int y, int fg, char const *fmt, ...) {
 
 bool debugHUD = true;
 
-void drawScene_custom(S3L_Scene scene) {
-  S3L_Index triangleCount = scene.models[0].triangleCount;
+// TODO: Change the number
+S3L_Vec4 projectedVertices[3000];
 
-  S3L_Index triangleIndex = 0;
-    
+void drawScene_custom(S3L_Scene scene) {
   const S3L_Model3D* model = &(scene.models[0]);
   
-  while (triangleIndex < triangleCount)
-  {
-    triangleIndex++;
+  S3L_Index triangleCount = scene.models[0].triangleCount;
+  S3L_Index vertexCount = scene.models[0].vertexCount;
 
-    u32 vertexIndex0 = model->triangles[triangleIndex * 3] * 3;
-    u32 vertexIndex1 = model->triangles[triangleIndex * 3 + 1] * 3;
-    u32 vertexIndex2 = model->triangles[triangleIndex * 3 + 2] * 3;
+  S3L_Index vertexIndex = 0;
 
-    if (model->vertices[vertexIndex0 + 2] == 0 || model->vertices[vertexIndex1 + 2] == 0 || model->vertices[vertexIndex2 + 2] == 0) {
-      continue;
-    }
+  prof_enter(perf_transform);
 
-    prof_enter(perf_transform);
-    i32 x0 = model->vertices[vertexIndex0];
-    i32 y0 = model->vertices[vertexIndex0 + 1];
-    i32 z0 = model->vertices[vertexIndex0 + 2];
+  // TODO: Should we use a 3x3 matrix for this?
+  // Is it faster or slower than two 2D transforms?
+  S3L_Unit sinYaw = S3L_sin(-scene.camera.transform.rotation.y);
+  S3L_Unit cosYaw = S3L_cos(-scene.camera.transform.rotation.y);
 
-    i32 x1 = model->vertices[vertexIndex1];
-    i32 y1 = model->vertices[vertexIndex1 + 1];
-    i32 z1 = model->vertices[vertexIndex1 + 2];
+  S3L_Unit sinPitch = S3L_sin(-scene.camera.transform.rotation.x);
+  S3L_Unit cosPitch = S3L_cos(-scene.camera.transform.rotation.x);
 
-    i32 x2 = model->vertices[vertexIndex2];
-    i32 y2 = model->vertices[vertexIndex2 + 1];
-    i32 z2 = model->vertices[vertexIndex2 + 2];
+  while (vertexIndex < vertexCount) {
+    i32 x = model->vertices[vertexIndex * 3];
+    i32 y = model->vertices[vertexIndex * 3 + 1];
+    i32 z = model->vertices[vertexIndex * 3 + 2];
 
-    x0 -= scene.camera.transform.translation.x;
-    x1 -= scene.camera.transform.translation.x;
-    x2 -= scene.camera.transform.translation.x;
+    x -= scene.camera.transform.translation.x;
+    y -= scene.camera.transform.translation.y;
+    z -= scene.camera.transform.translation.z;
 
-    y0 -= scene.camera.transform.translation.y;
-    y1 -= scene.camera.transform.translation.y;
-    y2 -= scene.camera.transform.translation.y;
+    i32 newX = (x * cosYaw - z * sinYaw) / S3L_F;
+    i32 newZ = (x * sinYaw + z * cosYaw) / S3L_F;
 
-    z0 -= scene.camera.transform.translation.z;
-    z1 -= scene.camera.transform.translation.z;
-    z2 -= scene.camera.transform.translation.z;
-    prof_leave(perf_transform);
+    x = newX;
+    z = newZ;
 
-    // u32 invZ0 = scene.camera.focalLength / z0;
-    // u32 invZ1 = scene.camera.focalLength / z1;
-    // u32 invZ2 = scene.camera.focalLength / z2;
+    i32 newZ2 = (z * cosPitch - y * sinPitch) / S3L_F;
+    i32 newY2 = (z * sinPitch + y * cosPitch) / S3L_F;
 
-    // azrp_triangle(
-    //   (invZ0 * x0) / S3L_F, (invZ0 * y0) / S3L_F,
-    //   (invZ1 * x1) / S3L_F, (invZ1 * y1) / S3L_F,
-    //   (invZ2 * x2) / S3L_F, (invZ2 * y2) / S3L_F,
-    //   colours[triangleIndex]
-    // );
-    
-    // azrp_triangle(
-    //   x0 / z0, y0 / z0,
-    //   x1 / z1, y1 / z1,
-    //   x2 / z2, y2 / z2,
-    //   colours[triangleIndex]
-    // );
+    z = newZ2;
+    y = newY2;
+
+    S3L_Vec4 v = { x, y, z };
+    _S3L_mapProjectedVertexToScreen(&v, scene.camera.focalLength);
+
+    projectedVertices[vertexIndex] = v;
+
+    vertexIndex++;
+  }
+  prof_leave(perf_transform);
+
+  S3L_Index triangleIndex = 0;
+
+  while (triangleIndex < triangleCount) {
+    u32 vertexIndex0 = model->triangles[triangleIndex * 3];
+    u32 vertexIndex1 = model->triangles[triangleIndex * 3 + 1];
+    u32 vertexIndex2 = model->triangles[triangleIndex * 3 + 2];
+
     S3L_Vec4 v0, v1, v2;
-    // S3L_project3DPointToScreen((S3L_Vec4) { x0, y0, z0 }, scene.camera, &v0);
-    // S3L_project3DPointToScreen((S3L_Vec4) { x1, y1, z1 }, scene.camera, &v1);
-    // S3L_project3DPointToScreen((S3L_Vec4) { x2, y2, z2 }, scene.camera, &v2);
-
-    prof_enter(perf_s3l_project);
-    // sleep_ms(10);
-    v0 = { x0, y0, z0 };
-    _S3L_mapProjectedVertexToScreen(&v0, scene.camera.focalLength);
-    v1 = { x1, y1, z1 };
-    _S3L_mapProjectedVertexToScreen(&v1, scene.camera.focalLength);
-    v2 = { x2, y2, z2 };
-    _S3L_mapProjectedVertexToScreen(&v2, scene.camera.focalLength);
-    prof_leave(perf_s3l_project);
+    v0 = projectedVertices[vertexIndex0];
+    v1 = projectedVertices[vertexIndex1];
+    v2 = projectedVertices[vertexIndex2];
 
     prof_enter(perf_checkvis);
     bool visible = S3L_triangleIsVisible(v0, v1, v2, model->config.backfaceCulling);
@@ -186,6 +172,8 @@ void drawScene_custom(S3L_Scene scene) {
       );
       prof_leave(perf_addtri);
     }
+
+    triangleIndex++;
   }
 }
 

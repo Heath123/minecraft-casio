@@ -59,6 +59,15 @@ color_t vary(color_t col, int x, int y, int z) {
 }
 
 S3L_Index addVertex(S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Unit x, S3L_Unit y, S3L_Unit z) {
+  // Search for an existing matching vertex
+  // TODO: This takes it from O(1) to O(n)
+  for (int i = 0; i < vertIndex; i++) {
+    if (vertices[(i * 3)] != x) continue;
+    if (vertices[(i * 3) + 1] != y) continue;
+    if (vertices[(i * 3) + 2] != z) continue;
+
+    return i;
+  }
   vertices[(vertIndex * 3)] = x;
   vertices[(vertIndex * 3) + 1] = y;
   vertices[(vertIndex * 3) + 2] = z;
@@ -129,12 +138,28 @@ vertexVisibility invisibleVertices = {
   false, false, false, false, false, false, false, false
 };
 
+// #define iter_1 x
+// #define iter_2 y
+// #define iter_3 z
+
+// #define n_1 16
+// #define n_2 32
+// #define n_3 16
+
+#define iter_1 (15 - z)
+#define iter_2 y
+#define iter_3 x
+
+#define n_1 16
+#define n_2 32
+#define n_3 16
+
 void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3L_Index &triIndex, const Chunk& chunk, int x, int y, int z) {
   // printf("Cube added at %d, %d, %d\n", x, y, z);
   u8 blockID = chunk.getBlock(x, y, z);
   if (!blockID) return;
 
-  u16 coord = (x * 32 * 16) + (y * 16) + z;
+  u16 coord = (iter_1 * n_2 * n_3) + (iter_2 * n_3) + iter_3;
 
   // // If it's surrounded in solid blocks then it's invisible
   if (chunk.getBlock(x + 1, y, z) != 0 &&
@@ -296,12 +321,13 @@ int findIndex(u16 coord, S3L_Model3D &levelModel) {
 }
 
 void colourTris(int x, int y, int z, S3L_Model3D &levelModel, u16* rollback_state, u16 (*effect)(u16 col, int index)) {
-  u16 coord = (x * 32 * 16) + (y * 16) + z;
+  u16 coord = (iter_1 * n_2 * n_3) + (iter_2 * n_3) + iter_3;
   int index = findIndex(coord, levelModel);
   // printf("Index: %d\n", index);
   if (index != -1) {
     // The index could be any tri in the block, so step back to find all of them
     index -= 12;
+    if (index < 0) index = 0;
     while (blockCoords[index] != coord) {
       index++;
     }
@@ -326,9 +352,10 @@ void generateMesh(const Chunk& chunk, S3L_Model3D &levelModel) {
   S3L_Index vertIndex = 0;
   S3L_Index triIndex = 0;
 
-  for (int x = 0; x < 16; x++) {
-    for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 16; z++) {
+  // for (int iter_1 = 0; iter_1 < n_1; iter_1++) {
+  for (int z = 15; z >= 0; z--) {
+    for (int iter_2 = 0; iter_2 < n_2; iter_2++) {
+      for (int iter_3 = 0; iter_3 < n_3; iter_3++) {
         genBlock(vertices, triangles, vertIndex, triIndex, chunk, x, y, z);
       }
     }
