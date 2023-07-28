@@ -1666,7 +1666,7 @@ constexpr ResultT f(int i) {
   if (i == 0) {
     return 0;
   }
-  return (focalLength * 256) / (i * 32);
+  return (focalLength * 16384) / (i * 16);
 }
 
 constexpr auto LUT = [] {
@@ -1689,10 +1689,10 @@ static inline void S3L_perspectiveDivide(S3L_Vec4 *vector,
   if (focalLength == 0)
     return;
 
-  vector->x = (vector->x * ((focalLength * 256) / vector->z)) / 256;
-  vector->y = (vector->y * ((focalLength * 256) / vector->z)) / 256;
-  // vector->x = (vector->x * LUT[vector->z / 32]) / 256;
-  // vector->y = (vector->y * LUT[vector->z / 32]) / 256;
+  // vector->x = (vector->x * ((focalLength * 256) / vector->z)) / 256;
+  // vector->y = (vector->y * ((focalLength * 256) / vector->z)) / 256;
+  vector->x = (vector->x * LUT[vector->z / 16]) / 16384;
+  vector->y = (vector->y * LUT[vector->z / 16]) / 16384;
 }
 
 void S3L_project3DPointToScreen(

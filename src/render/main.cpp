@@ -99,6 +99,47 @@ bool debugHUD = true;
 // TODO: Change the number
 S3L_Vec4 projectedVertices[3000];
 
+#define TRI_SORT
+
+typedef struct {
+  // uint8_t modelIndex;
+  S3L_Index triangleIndex;
+  uint16_t sortValue;
+} sortableTri;
+
+#ifdef TRI_SORT
+sortableTri triSortArray[S3L_MAX_TRIANGES_DRAWN];
+int triSortArraySize = 0;
+
+void quicksort(sortableTri* arr, int16_t low, int16_t high) {
+    if(low >= high) return;
+
+    sortableTri pivot = arr[(low + high) >> 1];
+
+    int i = low - 1;
+    int j = high + 1;
+
+    while (true) {
+        do i++;
+        while (arr[i].sortValue > pivot.sortValue);
+
+        do j--;
+        while (arr[j].sortValue < pivot.sortValue);
+
+        if(i >= j) break;
+
+        sortableTri tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    quicksort(arr, low, j);
+    quicksort(arr, j+1, high);
+}
+#endif
+
+// Much of this is a reimplementation of what small3dlib does anyway
+// However some of it is more specialized and therefore a little faster
 void drawScene_custom(S3L_Scene scene) {
   const S3L_Model3D* model = &(scene.models[0]);
   
@@ -138,7 +179,8 @@ void drawScene_custom(S3L_Scene scene) {
     z = newZ2;
     y = newY2;
 
-    S3L_Vec4 v = { x, y, z };
+    // Keeps the unprojected z in w sort sorting like small3dlib does
+    S3L_Vec4 v = { x, y, z, z };
     _S3L_mapProjectedVertexToScreen(&v, scene.camera.focalLength);
 
     projectedVertices[vertexIndex] = v;
@@ -148,6 +190,10 @@ void drawScene_custom(S3L_Scene scene) {
   prof_leave(perf_transform);
 
   S3L_Index triangleIndex = 0;
+
+  #ifdef TRI_SORT
+  triSortArraySize = 0;
+  #endif
 
   while (triangleIndex < triangleCount) {
     u32 vertexIndex0 = model->triangles[triangleIndex * 3];
@@ -163,6 +209,15 @@ void drawScene_custom(S3L_Scene scene) {
     bool visible = S3L_triangleIsVisible(v0, v1, v2, model->config.backfaceCulling);
     prof_leave(perf_checkvis);
     if (visible) {
+      #ifdef TRI_SORT
+      // TODO
+      if (triSortArraySize >= S3L_MAX_TRIANGES_DRAWN) break;
+      triSortArray[triSortArraySize] = {
+        .triangleIndex = triangleIndex,
+        .sortValue = (uint16_t) ((v0.w + v1.w + v2.w) >> 2)
+      };
+      triSortArraySize++;
+      #else
       prof_enter(perf_addtri);
       azrp_triangle(
         v0.x, v0.y,
@@ -171,10 +226,40 @@ void drawScene_custom(S3L_Scene scene) {
         colours[triangleIndex]
       );
       prof_leave(perf_addtri);
+      #endif
     }
 
     triangleIndex++;
   }
+
+  #ifdef TRI_SORT
+  prof_enter(perf_s3l_sort);
+  quicksort(triSortArray, 0, triSortArraySize - 1);
+  prof_leave(perf_s3l_sort);
+
+  S3L_Index sortedIndex = 0;
+  while (sortedIndex < triSortArraySize) {
+    S3L_Index triangleIndex = triSortArray[sortedIndex].triangleIndex;
+
+    u32 vertexIndex0 = model->triangles[triangleIndex * 3];
+    u32 vertexIndex1 = model->triangles[triangleIndex * 3 + 1];
+    u32 vertexIndex2 = model->triangles[triangleIndex * 3 + 2];
+
+    S3L_Vec4 v0, v1, v2;
+    v0 = projectedVertices[vertexIndex0];
+    v1 = projectedVertices[vertexIndex1];
+    v2 = projectedVertices[vertexIndex2];
+
+    azrp_triangle(
+      v0.x, v0.y,
+      v1.x, v1.y,
+      v2.x, v2.y,
+      colours[triangleIndex]
+    );
+
+    sortedIndex++;
+  }
+  #endif
 }
 
 void draw(void) {

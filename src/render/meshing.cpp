@@ -68,6 +68,7 @@ S3L_Index addVertex(S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Unit x, S3L_Un
 
     return i;
   }
+  
   vertices[(vertIndex * 3)] = x;
   vertices[(vertIndex * 3) + 1] = y;
   vertices[(vertIndex * 3) + 2] = z;
