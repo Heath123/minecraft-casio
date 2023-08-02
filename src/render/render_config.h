@@ -1,7 +1,7 @@
 #define TEXTURES 0 // whether to use textures for the level
 #define FOG 0
 
-#define RES_SCALE 2
+#define RES_SCALE 1
 
 #define S3L_RESOLUTION_X (396 / RES_SCALE)
 #define S3L_RESOLUTION_Y (224 / RES_SCALE)

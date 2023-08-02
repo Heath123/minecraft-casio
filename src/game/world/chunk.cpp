@@ -8,7 +8,10 @@ Chunk::Chunk() {
 }
 
 u8 Chunk::getBlock(int x, int y, int z) const {
-  // if (x >= CHUNK_WIDTH) x-= CHUNK_WIDTH;
+  // if (x >= CHUNK_WIDTH) x -= CHUNK_WIDTH;
+  // if (z >= CHUNK_WIDTH) z -= CHUNK_WIDTH;
+  // if (x >= CHUNK_WIDTH) x -= CHUNK_WIDTH;
+  // if (z >= CHUNK_WIDTH) z -= CHUNK_WIDTH;
   
   if (x < 0 || x >= CHUNK_WIDTH || y < 0 || y >= CHUNK_DEPTH || z < 0 ||
       z >= CHUNK_HEIGHT)

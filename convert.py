@@ -1,6 +1,6 @@
 from nbt.nbt import NBTFile
 
-nbtfile = NBTFile("chunk.nbt", "rb")
+nbtfile = NBTFile("32.nbt", "rb")
 
 size = [x.value for x in nbtfile["size"]]
 # print("Size:", size)
@@ -27,5 +27,13 @@ for block in nbtfile["blocks"]:
       blockID = 3
     elif name == "minecraft:oak_log":
       blockID = 4
+    elif name == "minecraft:sand":
+      blockID = 5
+    elif name == "minecraft:stone":
+      blockID = 6
+    elif name == "minecraft:water":
+      blockID = 7
+    elif name == "minecraft:wall_torch":
+      blockID = 0
     if blockID != 0:
-      print(f"chunk->setBlock({pos[0]}, {pos[1]}, {pos[2]}, {blockID});")
+      print(f"chunk->setBlock({31 - pos[0]}, {pos[1]}, {pos[2]}, {blockID});")

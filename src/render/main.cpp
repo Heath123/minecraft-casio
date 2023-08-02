@@ -97,7 +97,7 @@ void azrp_print2(int x, int y, int fg, char const *fmt, ...) {
 bool debugHUD = true;
 
 // TODO: Change the number
-S3L_Vec4 projectedVertices[3000];
+S3L_Vec4 projectedVertices[6750];
 
 #define TRI_SORT
 
@@ -167,6 +167,20 @@ void drawScene_custom(S3L_Scene scene) {
     y -= scene.camera.transform.translation.y;
     z -= scene.camera.transform.translation.z;
 
+    const int renderDistance = 11;
+
+    if (x > (S3L_F * renderDistance) || x < -(S3L_F * renderDistance)) {
+      projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
+      vertexIndex++;
+      continue;
+    }
+
+    if (z > (S3L_F * renderDistance) || z < -(S3L_F * renderDistance)) {
+      projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
+      vertexIndex++;
+      continue;
+    }
+
     i32 newX = (x * cosYaw - z * sinYaw) / S3L_F;
     i32 newZ = (x * sinYaw + z * cosYaw) / S3L_F;
 
@@ -205,6 +219,11 @@ void drawScene_custom(S3L_Scene scene) {
     v1 = projectedVertices[vertexIndex1];
     v2 = projectedVertices[vertexIndex2];
 
+    if (v0.w == -1 || v1.w == -1 || v2.w == -1) {
+      triangleIndex++;
+      continue;
+    }
+
     prof_enter(perf_checkvis);
     bool visible = S3L_triangleIsVisible(v0, v1, v2, model->config.backfaceCulling);
     prof_leave(perf_checkvis);
@@ -214,7 +233,9 @@ void drawScene_custom(S3L_Scene scene) {
       if (triSortArraySize >= S3L_MAX_TRIANGES_DRAWN) break;
       triSortArray[triSortArraySize] = {
         .triangleIndex = triangleIndex,
-        .sortValue = (uint16_t) ((v0.w + v1.w + v2.w) >> 2)
+        // Adding S3L_F helps prevent underflow of negative values
+        // TODO: Consider using a signed value instead?
+        .sortValue = (uint16_t) (((v0.w + v1.w + v2.w) >> 2) + S3L_F)
       };
       triSortArraySize++;
       #else
@@ -254,6 +275,7 @@ void drawScene_custom(S3L_Scene scene) {
       v0.x, v0.y,
       v1.x, v1.y,
       v2.x, v2.y,
+      // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
       colours[triangleIndex]
     );
 
@@ -577,10 +599,10 @@ void mainLoop(void) {
   u32 addtri = prof_time(perf_addtri);
   u32 other = total - (s3l_sort + sort + render + project + transform + checkvis + addtri);
 
-  drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
-  dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
-  dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
-  r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
+  // drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
+  // dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
+  // dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
+  // r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
 
   // azrp_render_fragments();
   // azrp_clear_commands();
@@ -592,7 +614,7 @@ void mainLoop(void) {
   frame++;
 }
 
-bool frameCapEnabled = false;
+bool frameCapEnabled = true;
 
 static int callback_tick(volatile int *newFrameNeeded) {
   *newFrameNeeded = 1;
@@ -649,14 +671,14 @@ int main(void) {
   chunk = new Chunk();
   World* world = new World(*chunk);
   mainPlayer = new Player(*chunk);
-  mainPlayer->setPos(vec3(5.5, 3.0, 3.5));
+  mainPlayer->setPos(vec3(19.3, 5.0, 5.7));
   // printf("First: x: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
   // chunk->setBlock(0, 0, 0, 0);
   // printf("2: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
 
-  for (int x = 0; x < 16; x++) {
+  for (int x = 0; x < 32; x++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 16; z++) {
+      for (int z = 0; z < 32; z++) {
         chunk->setBlock(x, y, z, 0);
       }
     }

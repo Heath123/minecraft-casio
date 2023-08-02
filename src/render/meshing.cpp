@@ -9,8 +9,8 @@
 S3L_Model3D chunkModel;
 
 
-#define MAX_VERTICES 9000
-#define MAX_TRIANGLES 3000
+#define MAX_VERTICES 6750
+#define MAX_TRIANGLES 13500
 
 #define DIRT_BROWN  C_RGB(17, 12, 8)
 // #define DIRT_BROWN2 C_RGB(15, 10, 6)
@@ -34,6 +34,7 @@ constexpr color_t darken(color_t colour, unsigned int amount) {
 
 #define topped(top, col) top, darken(col, 2), darken(col, 1), darken(col, 1), col, col
 #define all(col) darken(col, 2), darken(col, 2), darken(col, 1), darken(col, 1), col, col
+#define uniform(col) col, col, col, col, col, col
 
 const color_t blockColours[][6] = {
   // Grass
@@ -52,9 +53,23 @@ const color_t blockColours[][6] = {
   {
     all(C_RGB(12, 9, 6))
   },
+  // Sand
+  {
+    all(C_RGB(27, 26, 20))
+  },
+  // Stone
+  {
+    all(C_RGB(16, 16, 16))
+  },
+  // Water
+  {
+    all(C_RGB(4, 11, 31))
+  },
 };
 
-color_t vary(color_t col, int x, int y, int z) {
+color_t vary(int blockID, color_t col, int x, int y, int z) {
+  if (blockID == 7) return col; // Water
+
   return (x + y + z) % 2 == 0 ? darken(col, 1) : col;
 }
 
@@ -147,13 +162,13 @@ vertexVisibility invisibleVertices = {
 // #define n_2 32
 // #define n_3 16
 
-#define iter_1 (15 - z)
+#define iter_1 x
 #define iter_2 y
-#define iter_3 x
+#define iter_3 z
 
-#define n_1 16
+#define n_1 32
 #define n_2 32
-#define n_3 16
+#define n_3 32
 
 void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3L_Index &triIndex, const Chunk& chunk, int x, int y, int z) {
   // printf("Cube added at %d, %d, %d\n", x, y, z);
@@ -250,37 +265,37 @@ void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3
   if (faceVisible.top) {
     // d h
     // c g
-    addQuad(triangles, triIndex, c, g, h, d, vary(blockColours[blockID - 1][0], x, y, z), coord);
+    addQuad(triangles, triIndex, c, g, h, d, vary(blockID, blockColours[blockID - 1][0], x, y, z), coord);
   }
 
   if (faceVisible.bottom) {
     // a e
     // b f
-    addQuad(triangles, triIndex, b, f, e, a, vary(blockColours[blockID - 1][1], x, y, z), coord);
+    addQuad(triangles, triIndex, b, f, e, a, vary(blockID, blockColours[blockID - 1][1], x, y, z), coord);
   }
 
   if (faceVisible.left) {
     // d c
     // b a
-    addQuad(triangles, triIndex, b, a, c, d, vary(blockColours[blockID - 1][2], x, y, z), coord);
+    addQuad(triangles, triIndex, b, a, c, d, vary(blockID, blockColours[blockID - 1][2], x, y, z), coord);
   }
 
   if (faceVisible.right) {
     // g h
     // e f
-    addQuad(triangles, triIndex, e, f, h, g, vary(blockColours[blockID - 1][3], x, y, z), coord);
+    addQuad(triangles, triIndex, e, f, h, g, vary(blockID, blockColours[blockID - 1][3], x, y, z), coord);
   }
 
   if (faceVisible.front) {
     // c g
     // a e
-    addQuad(triangles, triIndex, a, e, g, c, vary(blockColours[blockID - 1][4], x, y, z), coord);
+    addQuad(triangles, triIndex, a, e, g, c, vary(blockID, blockColours[blockID - 1][4], x, y, z), coord);
   }
 
   if (faceVisible.back) {
     // h d
     // f b
-    addQuad(triangles, triIndex, f, b, d, h, vary(blockColours[blockID - 1][5], x, y, z), coord);
+    addQuad(triangles, triIndex, f, b, d, h, vary(blockID, blockColours[blockID - 1][5], x, y, z), coord);
   }
 
   // vertices += vertIndex * 3;
@@ -354,7 +369,7 @@ void generateMesh(const Chunk& chunk, S3L_Model3D &levelModel) {
   S3L_Index triIndex = 0;
 
   // for (int iter_1 = 0; iter_1 < n_1; iter_1++) {
-  for (int z = 15; z >= 0; z--) {
+  for (int iter_1 = 0; iter_1 < n_1; iter_1++) {
     for (int iter_2 = 0; iter_2 < n_2; iter_2++) {
       for (int iter_3 = 0; iter_3 < n_3; iter_3++) {
         genBlock(vertices, triangles, vertIndex, triIndex, chunk, x, y, z);
