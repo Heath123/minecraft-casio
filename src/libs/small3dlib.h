@@ -1977,7 +1977,7 @@ uint8_t _S3L_projectedTriangleState = 0; // 0 = normal, 1 = cut, 2 = split
 S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
 #endif
 
-extern uint16_t colours[];
+// extern texture colours[];
 
 void S3L_drawTriangle(
   S3L_Vec4 point0,
@@ -2041,7 +2041,7 @@ void S3L_drawTriangle(
     point1.y /* / S3L_FRACTIONS_PER_UNIT */,
     point2.x /* / S3L_FRACTIONS_PER_UNIT */,
     point2.y /* / S3L_FRACTIONS_PER_UNIT */,
-    colours[triangleIndex]);
+    /*colours[triangleIndex]*/0);
 // #if S3L_FLAT
 //   *barycentric0 = S3L_F / 3;
 //   *barycentric1 = S3L_F / 3;

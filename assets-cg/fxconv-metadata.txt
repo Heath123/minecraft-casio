@@ -5,3 +5,8 @@ font5x7.png:
   grid.size: 5x7
   grid.padding: 1
   grid.border: 0
+
+tileset.png:
+  type: bopti-image
+  name: tileset
+  profile: p8

@@ -11,8 +11,8 @@ using libnum::vec;
 
 class Chunk {
 private:
-  static constexpr int CHUNK_WIDTH = 32;
-  static constexpr int CHUNK_HEIGHT = 32;
+  static constexpr int CHUNK_WIDTH = 16;
+  static constexpr int CHUNK_HEIGHT = 16;
   static constexpr int CHUNK_DEPTH = 32;
   std::array<u8, CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH> blocks;
 

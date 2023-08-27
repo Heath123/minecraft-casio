@@ -24,6 +24,18 @@ Player::Player(Chunk &chunk) : bounds(vec3(0), vec3(0)), chunk(chunk) {
 }
 
 void Player::tick(num32 lrMove, num32 fbMove) {
+  if (vel.x < num32(0.003) && vel.x > num32(-0.003)) {
+    vel.x = 0;
+  }
+
+  if (vel.y < num32(0.003) && vel.y > num32(-0.003)) {
+    vel.y = 0;
+  }
+
+  if (vel.z < num32(0.003) && vel.z > num32(-0.003)) {
+    vel.z = 0;
+  }
+
   // BoundingBox bb = chunk.getBlockBB(5, 4, 9);
   // num32 dist = bounds.distanceToIntersection(100, Axis::AXIS_Z, bb);
 

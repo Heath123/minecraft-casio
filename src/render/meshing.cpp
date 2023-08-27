@@ -33,17 +33,19 @@ constexpr color_t darken(color_t colour, unsigned int amount) {
 #define U S3L_F
 
 #define topped(top, col) top, darken(col, 2), darken(col, 1), darken(col, 1), col, col
-#define all(col) darken(col, 2), darken(col, 2), darken(col, 1), darken(col, 1), col, col
-#define uniform(col) col, col, col, col, col, col
+#define all(col) makeCol(darken(col, 2)), makeCol(darken(col, 2)), makeCol(darken(col, 1)), makeCol(darken(col, 1)), makeCol(col), makeCol(col)
+// #define uniform(col) col, col, col, col, col, col
 
-const color_t blockColours[][6] = {
+#define texPal(tex, pal) (texture) { /* .isColour = */ false, { /* .palIndex = */ pal, /* .texIndex = */ tex } }
+
+const texture blockColours[][6] = {
   // Grass
   {
-    topped(GRASS_GREEN, DIRT_BROWN)
+    texPal(4, 0), texPal(2, 3), texPal(2, 2), texPal(2, 2), texPal(2, 1), texPal(2, 1)
   },
   // Wood
   {
-    all(C_RGB(21, 16, 9))
+    texPal(0, 0), texPal(0, 3), texPal(0, 2), texPal(0, 2), texPal(0, 1), texPal(0, 1)
   },
   // Leaves
   {
@@ -67,10 +69,11 @@ const color_t blockColours[][6] = {
   },
 };
 
-color_t vary(int blockID, color_t col, int x, int y, int z) {
-  if (blockID == 7) return col; // Water
+texture vary(int blockID, texture col, int x, int y, int z) {
+  if (!col.isColour) return col;
+  if (blockID == 7) return col;
 
-  return (x + y + z) % 2 == 0 ? darken(col, 1) : col;
+  return (x + y + z) % 2 == 0 ? makeCol(darken(col.col, 1)) : col;
 }
 
 S3L_Index addVertex(S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Unit x, S3L_Unit y, S3L_Unit z) {
@@ -93,12 +96,12 @@ S3L_Index addVertex(S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Unit x, S3L_Un
 }
 
 // TODO: Make these heap allocated like the other two
-u16 colours[MAX_TRIANGLES];
+texture colours[MAX_TRIANGLES];
 // This can be binary-searched in order to find triangles corresponding to a block coordinate
 // TODO: Do it per quad instead of per triangle?
 u16 blockCoords[MAX_TRIANGLES] = {UINT16_MAX};
 
-S3L_Index addTriangle(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, color_t col, u16 coord) {
+S3L_Index addTriangle(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, texture col, u16 coord) {
   triangles[(triIndex * 3)] = index1;
   triangles[(triIndex * 3) + 1] = index2;
   triangles[(triIndex * 3) + 2] = index3;
@@ -109,12 +112,19 @@ S3L_Index addTriangle(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index
   return index;
 }
 
-void addQuad(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, S3L_Index index4, color_t col, u16 coord) {
-  addTriangle(triangles, triIndex, index1, index2, index4, col, coord);
-  addTriangle(triangles, triIndex, index2, index3, index4, col, coord);
+#define flip(tex) (texture) { /*.isColour = */ false, { /* .palIndex = */ tex.palIndex, /* .texIndex = */ (u16) (tex.texIndex + 1) } }
+
+void addQuad(S3L_Index* triangles, S3L_Index &triIndex, S3L_Index index1, S3L_Index index2, S3L_Index index3, S3L_Index index4, texture col, u16 coord) {
+  if (col.isColour) {
+    addTriangle(triangles, triIndex, index4, index1, index2, col, coord);
+    addTriangle(triangles, triIndex, index2, index3, index4, col, coord);
+  } else {
+    addTriangle(triangles, triIndex, index4, index1, index2, flip(col), coord);
+    addTriangle(triangles, triIndex, index2, index3, index4, col, coord);
+  }
 }
 
-void addQuadWithVertices(S3L_Index* triangles, S3L_Index &triIndex, S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Vec4 pos1, S3L_Vec4 pos2, S3L_Vec4 pos3, S3L_Vec4 pos4, color_t col, u16 coord) {
+void addQuadWithVertices(S3L_Index* triangles, S3L_Index &triIndex, S3L_Unit* vertices, S3L_Index &vertIndex, S3L_Vec4 pos1, S3L_Vec4 pos2, S3L_Vec4 pos3, S3L_Vec4 pos4, texture col, u16 coord) {
   S3L_Index a = addVertex(vertices, vertIndex, pos1.x, pos1.y, pos1.z);
   S3L_Index b = addVertex(vertices, vertIndex, pos2.x, pos2.y, pos2.z);
   S3L_Index c = addVertex(vertices, vertIndex, pos3.x, pos3.y, pos3.z);
@@ -166,9 +176,9 @@ vertexVisibility invisibleVertices = {
 #define iter_2 y
 #define iter_3 z
 
-#define n_1 32
+#define n_1 16
 #define n_2 32
-#define n_3 32
+#define n_3 16
 
 void genBlock(S3L_Unit* vertices, S3L_Index* triangles, S3L_Index &vertIndex, S3L_Index &triIndex, const Chunk& chunk, int x, int y, int z) {
   // printf("Cube added at %d, %d, %d\n", x, y, z);
@@ -336,7 +346,7 @@ int findIndex(u16 coord, S3L_Model3D &levelModel) {
   return -1;
 }
 
-void colourTris(int x, int y, int z, S3L_Model3D &levelModel, u16* rollback_state, u16 (*effect)(u16 col, int index)) {
+void colourTris(int x, int y, int z, S3L_Model3D &levelModel, texture* rollback_state, texture (*effect)(texture col, int index)) {
   u16 coord = (iter_1 * n_2 * n_3) + (iter_2 * n_3) + iter_3;
   int index = findIndex(coord, levelModel);
   // printf("Index: %d\n", index);

@@ -1953,7 +1953,7 @@ typedef struct
 extern S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
 #endif
 
-extern uint16_t colours[];
+// extern texture colours[];
 
 // void S3L_drawTriangle(
 //   S3L_Vec4 point0,

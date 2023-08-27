@@ -1,0 +1,240 @@
+/* 60(8/9)00 */
+
+.global _azrp_shader_triangle2
+.align 4
+
+#define _frag r6
+#define _texture r7
+#define _u r8
+#define _v r9
+#define _w r10
+#define _du_x r11
+#define _dv_x r12
+#define _dw_x r13
+
+/* r0: (temporary)
+   r1: y counter
+   r2: (temporary)
+   r3: x_max - x_min + 1
+   r4: azrp_width * 2
+   r5: cmd
+   r6: frag
+   r7: texture
+   r8-r10: u-w
+   r11-r13: d*_x
+   r14: #-31 (for NULL canceling) */
+_azrp_shader_triangle2:
+	mov.w	@r5+, r0	/* y */
+	shll	r4
+
+	mov.w	@r5+, r1	/* height_frag (y counter) */
+	nop
+
+	mov.w	@r5+, r2	/* x_min */
+	extu.b	r0, r0
+
+	mov.w	@r5+, r3	/* x_max */
+	extu.b	r1, r1
+
+	mov.w	@r5+, _texture	/* color */
+	mulu.w	r4, r0
+
+	mov.l	r8, @-r15
+	add	#2, r5
+
+	mov.l	r9, @-r15
+	sub	r2, r3
+
+	mov.l	r10, @-r15
+	add	#1, r3
+
+	mov.l	r11, @-r15
+	sts	macl, r0
+
+	/* ldrs	2f */ nop
+	add	r0, _frag
+
+	/* ldre	3f */ nop
+	add	r2, _frag
+
+	mov.l	r12, @-r15
+	add	r2, _frag
+
+	mov.l	r13, @-r15
+	sub	r3, r4
+
+	mov.l	r14, @-r15
+	sub	r3, r4
+
+	mov.l	@r5, _u
+	mov	#4, r14
+
+	mov.l	@(4, r5), _v
+	add	#-2, _frag
+
+	mov.l	@(8, r5), _w
+	nop
+
+	mov.l	@(12, r5), _du_x
+	/* not	_u, _u */
+	nop
+
+	mov.l	@(16, r5), _dv_x
+	/* not	_v, _v */
+	nop
+
+	mov.l	@(20, r5), _dw_x
+	/* not	_w, _w */
+	nop
+
+	/* TODO: This overwrites the colour */
+	mov.l	@(36, r5), _texture
+	nop
+
+	/* Loop on y */
+1:/*	ldrc	r3
+	nop */
+	mov.l r3, @-r15
+	nop
+
+	mov.l r1, @-r15
+	nop
+
+	mov.l	@(40, r5), r1
+	nop
+
+	bra start_noadd
+	nop
+
+.align 4
+top:
+	dt r3
+	add	_du_x, _u
+
+	bt.s end
+	add	_dv_x, _v
+
+start_partadd:
+
+	add	_dw_x, _w
+	nop
+
+start_noadd:
+
+	mov	_u, r2
+	or	_v, r2
+
+	add #2, _frag
+	nop
+
+	or	_w, r2
+	mov.w	@_frag, r0
+
+	/* Skip over the drawing */
+	cmp/pz r2
+	bf top
+
+	tst r0, r0
+	bf top
+
+	mov _w, r0
+	shlr16 r0
+	
+	mov _u, r2
+	shlr16 r2
+
+	shad r14, r2
+	nop
+
+	add r2, r0
+	nop
+
+	mov.b @(r0, _texture), r0
+	add	_du_x, _u
+
+	shll r0 /* Merging these two has no benefit because of the 2-cycle stall so */
+	nop
+
+	dt r3 /* leave them separated in case we can squeeze anything into the delay slots later */
+	nop
+
+	mov.w @(r0, r1), r2
+	add	_dv_x, _v
+	
+	bf.s start_partadd
+	mov.w r2, @r6
+
+end:
+
+	add	_dw_x, _w
+	nop
+
+	mov.l @r15+, r1
+	nop
+
+	mov.l @r15+, r3
+	nop
+
+	/* Sloooow */
+	add	r4, _frag
+	mov.l	@(24, r5), r0
+
+	dt	r1
+	mov.l	@(28, r5), r2
+
+	add	r0, _u
+	mov.l	@(32, r5), r0
+
+	add	r2, _v
+	nop
+
+	bf.s	1b
+	add	r0, _w
+
+	add	#-12, r5
+	mov	#0, r0
+
+	/* 1 cycle lost */
+
+	/* not	_u, _u
+	not	_v, _v
+	not	_w, _w */
+
+	mov.l	_u, @(12, r5)
+	mov.l	_v, @(16, r5)
+	mov.l	_w, @(20, r5)
+	mov.b	r0, @(1, r5)
+
+	/* Slooow */
+	mov.b	@(3, r5), r0
+	extu.b	r0, r0
+	mov	r0, r2
+	mov.b	@(2, r5), r0
+	extu.b	r0, r0
+	sub	r2, r0
+	mov.b	r0, @(2, r5)
+
+	mov.l	.azrp_frag_height, r1
+	mov.l	@r1, r1
+
+	cmp/ge	r0, r1
+	bt	4f
+	mov	r1, r0
+
+4:	mov.b	r0, @(3, r5)
+
+	mov.l	@r15+, r14
+	mov.l	@r15+, r13
+	mov.l	@r15+, r12
+	mov.l	@r15+, r11
+	mov.l	@r15+, r10
+	mov.l	@r15+, r9
+	rts
+	mov.l	@r15+, r8
+
+.balign 4
+.azrp_frag_height:
+	.long	_azrp_frag_height
+
+.pallete:
+	.long 256

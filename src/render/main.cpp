@@ -42,6 +42,21 @@ prof_t perf_addtri;
 #include "util/angle.h"
 #include "util/colour.h"
 
+extern "C" void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, uint8_t* texture, color_t* palette);
+
+// extern "C" bopti_image_t planks;
+// extern "C" bopti_image_t planksf;
+
+// extern "C" bopti_image_t grass_side;
+// extern "C" bopti_image_t grass_sidef;
+
+// extern "C" bopti_image_t grass_top;
+// extern "C" bopti_image_t grass_topf;
+
+// bopti_image_t* textures[] = {&planks, &planksf, &grass_side, &grass_sidef, &grass_top, &grass_topf};
+
+extern "C" bopti_image_t tileset;
+
 #define STDIN_FILENO  0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -138,6 +153,11 @@ void quicksort(sortableTri* arr, int16_t low, int16_t high) {
 }
 #endif
 
+u16* palettes[5];
+
+// TODO: Put this in a header
+extern texture colours[];
+
 // Much of this is a reimplementation of what small3dlib does anyway
 // However some of it is more specialized and therefore a little faster
 void drawScene_custom(S3L_Scene scene) {
@@ -167,19 +187,19 @@ void drawScene_custom(S3L_Scene scene) {
     y -= scene.camera.transform.translation.y;
     z -= scene.camera.transform.translation.z;
 
-    const int renderDistance = 11;
+    // const int renderDistance = 11;
 
-    if (x > (S3L_F * renderDistance) || x < -(S3L_F * renderDistance)) {
-      projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
-      vertexIndex++;
-      continue;
-    }
+    // if (x > (S3L_F * renderDistance) || x < -(S3L_F * renderDistance)) {
+    //   projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
+    //   vertexIndex++;
+    //   continue;
+    // }
 
-    if (z > (S3L_F * renderDistance) || z < -(S3L_F * renderDistance)) {
-      projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
-      vertexIndex++;
-      continue;
-    }
+    // if (z > (S3L_F * renderDistance) || z < -(S3L_F * renderDistance)) {
+    //   projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
+    //   vertexIndex++;
+    //   continue;
+    // }
 
     i32 newX = (x * cosYaw - z * sinYaw) / S3L_F;
     i32 newZ = (x * sinYaw + z * cosYaw) / S3L_F;
@@ -219,10 +239,10 @@ void drawScene_custom(S3L_Scene scene) {
     v1 = projectedVertices[vertexIndex1];
     v2 = projectedVertices[vertexIndex2];
 
-    if (v0.w == -1 || v1.w == -1 || v2.w == -1) {
-      triangleIndex++;
-      continue;
-    }
+    // if (v0.w == -1 || v1.w == -1 || v2.w == -1) {
+    //   triangleIndex++;
+    //   continue;
+    // }
 
     prof_enter(perf_checkvis);
     bool visible = S3L_triangleIsVisible(v0, v1, v2, model->config.backfaceCulling);
@@ -271,13 +291,27 @@ void drawScene_custom(S3L_Scene scene) {
     v1 = projectedVertices[vertexIndex1];
     v2 = projectedVertices[vertexIndex2];
 
-    azrp_triangle(
-      v0.x, v0.y,
-      v1.x, v1.y,
-      v2.x, v2.y,
-      // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
-      colours[triangleIndex]
-    );
+    texture col = colours[triangleIndex];
+
+    if (col.isColour) {
+      azrp_triangle(
+        v0.x, v0.y,
+        v1.x, v1.y,
+        v2.x, v2.y,
+        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+        col.col
+      );
+    } else {
+      azrp_triangle2(
+        v0.x, v0.y,
+        v1.x, v1.y,
+        v2.x, v2.y,
+        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+        C_RED,
+        ((uint8_t*) tileset.data) + (col.texIndex * 256),
+        palettes[col.palIndex]
+      );
+    }
 
     sortedIndex++;
   }
@@ -483,62 +517,66 @@ void mainLoop(void) {
   bool F2 = keydown(KEY_F2);
 
   // if ((F1 && !lastF1) || (F2 && !lastF2)) {
-  S3L_Vec4 rayDir;
-  S3L_rotationToDirections(scene.camera.transform.rotation, S3L_F, &rayDir, 0, 0);
-  bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 3, hit_position, hit_position_int, hit_normal);
-  if (!result) {
-    hit_position_int = { -1, -1, -1 };
-  }
+    S3L_Vec4 rayDir;
+    S3L_rotationToDirections(scene.camera.transform.rotation, S3L_F, &rayDir, 0, 0);
+    bool result = traceRay(getVoxel, mainPlayer->getCameraPos(), toVec3(rayDir), 3, hit_position, hit_position_int, hit_normal);
+    if (!result) {
+      hit_position_int = { -1, -1, -1 };
+    }
 
-  static vec<int, 3> lastPos = { -1, -1, -1 };
-  static u16 last_state[12] = { 0 };
+    static vec<int, 3> lastPos = { -1, -1, -1 };
+    static texture last_state[12] = { 0 };
 
-  if (lastPos != hit_position_int) {
-    // Rollback the last one if it exists
-    if (lastPos != vec<int, 3>{ -1, -1, -1 }) {
-      colourTris(lastPos.x, lastPos.y, lastPos.z, levelModel, 0, [](u16 col, int index) -> u16 { return last_state[index]; });
+    if (lastPos != hit_position_int) {
+      // Rollback the last one if it exists
+      if (lastPos != vec<int, 3>{ -1, -1, -1 }) {
+        colourTris(lastPos.x, lastPos.y, lastPos.z, levelModel, 0, [](texture col, int index) -> texture { return last_state[index]; });
+      }
+
+      if (result) {
+        // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
+
+        colourTris(hit_position_int.x, hit_position_int.y, hit_position_int.z, levelModel, last_state, [](texture tex, int index) -> texture {
+          // Lighten slightly
+          if (tex.isColour) {
+            return makeCol((u16) mix(lighten(tex.col), tex.col));
+          } else {
+            return (texture) { /*.isColour = */ false, { /* .palIndex = */ 4, /* .texIndex = */ tex.texIndex } };
+          }
+        });
+      }
+      lastPos = hit_position_int;
     }
 
     if (result) {
-      // printf("%d, %d, %d\n", hit_position_int.x, hit_position_int.y, hit_position_int.z);
+      bool shouldChange = false;
+      vec<int, 3> pos;
+      u8 block;
+      if (F1 && !lastF1) {
+        pos = hit_position_int;
+        block = 0;
+        shouldChange = true;
+      } else if (F2 && !lastF2) {
+        pos = hit_position_int + hit_normal;
+        block = 2;
+        shouldChange = true;
+      }
 
-      colourTris(hit_position_int.x, hit_position_int.y, hit_position_int.z, levelModel, last_state, [](u16 col, int index) -> u16 {
-        // Lighten slightly
-        return mix(lighten(col), col);
-      });
-    }
-    lastPos = hit_position_int;
+      if (shouldChange) {
+        vec3 fracPos = vec3(pos.x, pos.y, pos.z);
+        BoundingBox toPlaceBB = BoundingBox(fracPos, fracPos + vec3(1));
+        // mainPlayer->pos.y.v += 1;
+        // mainPlayer->updateBounds();
+        if (!mainPlayer->bounds.intersects(toPlaceBB)) {
+          chunk->setBlock(pos, block);
 
-  }
-
-  if (result) {
-    bool shouldChange = false;
-    vec<int, 3> pos;
-    u8 block;
-    if (F1 && !lastF1) {
-      pos = hit_position_int;
-      block = 0;
-      shouldChange = true;
-    } else if (F2 && !lastF2) {
-      pos = hit_position_int + hit_normal;
-      block = 2;
-      shouldChange = true;
-    }
-
-    if (shouldChange) {
-      vec3 fracPos = vec3(pos.x, pos.y, pos.z);
-      BoundingBox toPlaceBB = BoundingBox(fracPos, fracPos + vec3(1));
-      // mainPlayer->pos.y.v += 1;
-      // mainPlayer->updateBounds();
-      if (!mainPlayer->bounds.intersects(toPlaceBB)) {
-        chunk->setBlock(pos, block);
-
-        delete levelModel.triangles;
-        delete levelModel.vertices;
-        generateMesh(*chunk, levelModel);
+          delete levelModel.triangles;
+          delete levelModel.vertices;
+          generateMesh(*chunk, levelModel);
+        }
       }
     }
-  }
+  // }
 
   lastF1 = keydown(KEY_F1);
   lastF2 = keydown(KEY_F2);
@@ -599,10 +637,10 @@ void mainLoop(void) {
   u32 addtri = prof_time(perf_addtri);
   u32 other = total - (s3l_sort + sort + render + project + transform + checkvis + addtri);
 
-  // drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
-  // dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
-  // dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
-  // r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
+  drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
+  dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
+  dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
+  r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
 
   // azrp_render_fragments();
   // azrp_clear_commands();
@@ -641,6 +679,23 @@ bool getVoxel(double x, double y, double z) {
     return (y<0) ? 1 : 0;
 }
 
+// TODO: Use static storage maybe?
+u16* paletteWithEffect(u16* in, u16 (*effect)(u16 col)) {
+  u16* out = new u16[256];
+  for (int i = 0; i < 256; i++) {
+    out[i] = effect(in[i]);
+  }
+  return out;
+}
+
+// TODO: This is a bit hacky (to avoid a lambda capture)
+u8 globalBrightness;
+
+u16* paletteWithBrightness(u16* in, u8 brightness) {
+  globalBrightness = brightness;
+  return paletteWithEffect(in, [](u16 col) -> u16 { return alphaBlendRGB565(col, 0, globalBrightness); } );
+}
+
 int main(void) {
   prof_init();
   close(STDOUT_FILENO);
@@ -659,6 +714,16 @@ int main(void) {
 
   azrp_config_scale(RES_SCALE);
 
+  palettes[0] = tileset.palette;
+  // palettes[1] = paletteWithBrightness(tileset.palette, 25);
+  // palettes[2] = paletteWithBrightness(tileset.palette, 19);
+  // palettes[3] = paletteWithBrightness(tileset.palette, 16);
+  palettes[1] = paletteWithBrightness(tileset.palette, 29);
+  palettes[2] = paletteWithBrightness(tileset.palette, 24);
+  palettes[3] = paletteWithBrightness(tileset.palette, 22);
+
+  palettes[4] = paletteWithEffect(tileset.palette, [](u16 col) -> u16 { return mix(lighten(col), col); });
+
   // levelModelInit();
 
   // Allocate vertices
@@ -671,7 +736,14 @@ int main(void) {
   chunk = new Chunk();
   World* world = new World(*chunk);
   mainPlayer = new Player(*chunk);
-  mainPlayer->setPos(vec3(19.3, 5.0, 5.7));
+
+  mainPlayer->setPos(vec3(8.0, 9.0, 5.0));
+  mainPlayer->rotate(vec2(-400, 100));
+
+  // mainPlayer->setPos(vec3(10.5, 2.0, 15.5));
+  // mainPlayer->rotate(vec2(0, 300));
+
+  
   // printf("First: x: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());
   // chunk->setBlock(0, 0, 0, 0);
   // printf("2: %d, y: %d, z: %d\n", mainPlayer->getPos().x.ifloor(), mainPlayer->getPos().y.ifloor(), mainPlayer->getPos().z.ifloor());

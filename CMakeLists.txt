@@ -21,6 +21,8 @@ set(SOURCES
   src/util/boundingBox.cpp
   src/util/libnumToS3L.cpp
   src/util/angle.cpp
+  src/triangle2.c
+  src/triangle2.S
   # ...
 )
 # Shared assets, fx-9860G-only assets and fx-CG-50-only assets
@@ -33,6 +35,7 @@ set(ASSETS_fx
 )
 set(ASSETS_cg
   assets-cg/font5x7.png
+  assets-cg/tileset.png
   # ...
 )
 
@@ -40,7 +43,7 @@ fxconv_declare_assets(${ASSETS} ${ASSETS_fx} ${ASSETS_cg} WITH_METADATA)
 
 add_executable(minecraft ${SOURCES} ${ASSETS} ${ASSETS_${FXSDK_PLATFORM}})
 target_include_directories(minecraft PRIVATE src/)
-target_compile_options(minecraft PRIVATE -Wall -Wextra -Wno-comment -Wno-unused-parameter -Wno-unused-function -Wno-missing-field-initializers -Wno-unused-variable --std=c++20 -O3 -g)
+target_compile_options(minecraft PRIVATE -Wall -Wextra -Wno-comment -Wno-unused-parameter -Wno-unused-function -Wno-missing-field-initializers -Wno-unused-variable --std=c++20 -O3 -flto -g)
 target_link_libraries(minecraft PRIVATE
   Azur::Azur -lnum LibProf::LibProf Gint::Gint -lm -lstdc++)
 
