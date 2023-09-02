@@ -42,7 +42,7 @@ prof_t perf_addtri;
 #include "util/angle.h"
 #include "util/colour.h"
 
-extern "C" void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, uint8_t* texture, color_t* palette);
+extern "C" void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, uint8_t* texture, color_t* palette, int texSize);
 
 // extern "C" bopti_image_t planks;
 // extern "C" bopti_image_t planksf;
@@ -158,6 +158,30 @@ u16* palettes[5];
 // TODO: Put this in a header
 extern texture colours[];
 
+void rotateVec3(S3L_Vec4* vec4, S3L_Unit sinYaw, S3L_Unit cosYaw, S3L_Unit sinPitch, S3L_Unit cosPitch) {
+  i32 x = vec4->x;
+  i32 y = vec4->y;
+  i32 z = vec4->z;
+
+  i32 newX = (x * cosYaw - z * sinYaw) / S3L_F;
+  i32 newZ = (x * sinYaw + z * cosYaw) / S3L_F;
+
+  x = newX;
+  z = newZ;
+
+  i32 newZ2 = (z * cosPitch - y * sinPitch) / S3L_F;
+  i32 newY2 = (z * sinPitch + y * cosPitch) / S3L_F;
+
+  z = newZ2;
+  y = newY2;
+
+  vec4->x = x;
+  vec4->y = y;
+  vec4->z = z;
+}
+
+S3L_Vec4 particle = {0, 0, 0, 0 };
+
 // Much of this is a reimplementation of what small3dlib does anyway
 // However some of it is more specialized and therefore a little faster
 void drawScene_custom(S3L_Scene scene) {
@@ -187,7 +211,7 @@ void drawScene_custom(S3L_Scene scene) {
     y -= scene.camera.transform.translation.y;
     z -= scene.camera.transform.translation.z;
 
-    // const int renderDistance = 11;
+    // const int renderDistance = 4;
 
     // if (x > (S3L_F * renderDistance) || x < -(S3L_F * renderDistance)) {
     //   projectedVertices[vertexIndex] = { 0, 0, -1, -1 };
@@ -200,21 +224,10 @@ void drawScene_custom(S3L_Scene scene) {
     //   vertexIndex++;
     //   continue;
     // }
-
-    i32 newX = (x * cosYaw - z * sinYaw) / S3L_F;
-    i32 newZ = (x * sinYaw + z * cosYaw) / S3L_F;
-
-    x = newX;
-    z = newZ;
-
-    i32 newZ2 = (z * cosPitch - y * sinPitch) / S3L_F;
-    i32 newY2 = (z * sinPitch + y * cosPitch) / S3L_F;
-
-    z = newZ2;
-    y = newY2;
-
-    // Keeps the unprojected z in w sort sorting like small3dlib does
-    S3L_Vec4 v = { x, y, z, z };
+    S3L_Vec4 v = { x, y, z, 0 };
+    rotateVec3(&v, sinYaw, cosYaw, sinPitch, cosPitch);
+    // Keeps the unprojected z in w for sorting like small3dlib does
+    v.w = v.z;
     _S3L_mapProjectedVertexToScreen(&v, scene.camera.focalLength);
 
     projectedVertices[vertexIndex] = v;
@@ -239,10 +252,10 @@ void drawScene_custom(S3L_Scene scene) {
     v1 = projectedVertices[vertexIndex1];
     v2 = projectedVertices[vertexIndex2];
 
-    // if (v0.w == -1 || v1.w == -1 || v2.w == -1) {
-    //   triangleIndex++;
-    //   continue;
-    // }
+    if (v0.w == -1 || v1.w == -1 || v2.w == -1) {
+      triangleIndex++;
+      continue;
+    }
 
     prof_enter(perf_checkvis);
     bool visible = S3L_triangleIsVisible(v0, v1, v2, model->config.backfaceCulling);
@@ -278,6 +291,8 @@ void drawScene_custom(S3L_Scene scene) {
   quicksort(triSortArray, 0, triSortArraySize - 1);
   prof_leave(perf_s3l_sort);
 
+  int extraTriCount = 0;
+
   S3L_Index sortedIndex = 0;
   while (sortedIndex < triSortArraySize) {
     S3L_Index triangleIndex = triSortArray[sortedIndex].triangleIndex;
@@ -293,29 +308,135 @@ void drawScene_custom(S3L_Scene scene) {
 
     texture col = colours[triangleIndex];
 
-    if (col.isColour) {
-      azrp_triangle(
-        v0.x, v0.y,
-        v1.x, v1.y,
-        v2.x, v2.y,
-        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
-        col.col
-      );
+    if (v0.w > S3L_F * 3 || col.isColour) {
+      if (col.isColour) {
+        azrp_triangle(
+          v0.x, v0.y,
+          v1.x, v1.y,
+          v2.x, v2.y,
+          // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+          col.col
+          // C_RED
+        );
+      } else {
+        azrp_triangle2(
+          v0.x, v0.y,
+          v1.x, v1.y,
+          v2.x, v2.y,
+          C_RED,
+          ((uint8_t*) tileset.data) + (col.texIndex * 256),
+          palettes[col.palIndex],
+          16
+        );
+      }
     } else {
+      // azrp_triangle2(
+      //   v0.x, v0.y,
+      //   v1.x, v1.y,
+      //   v2.x, v2.y,
+      //   C_RED,
+      //   ((uint8_t*) tileset.data) + (col.texIndex * 256),
+      //   palettes[col.palIndex],
+      //   16
+      // );
+
+      S3L_Vec4 v3, v4, v5;
+      
+      v3.x = model->vertices[vertexIndex0 * 3] + model->vertices[vertexIndex1 * 3];
+      v3.x >>= 1;
+      v3.y = model->vertices[vertexIndex0 * 3 + 1] + model->vertices[vertexIndex1 * 3 + 1];
+      v3.y >>= 1;
+      v3.z = model->vertices[vertexIndex0 * 3 + 2] + model->vertices[vertexIndex1 * 3 + 2];
+      v3.z >>= 1;
+      S3L_vec3Sub(&v3, scene.camera.transform.translation);
+      rotateVec3(&v3, sinYaw, cosYaw, sinPitch, cosPitch);
+      _S3L_mapProjectedVertexToScreen(&v3, scene.camera.focalLength);
+
+      v4.x = model->vertices[vertexIndex0 * 3] + model->vertices[vertexIndex2 * 3];
+      v4.x >>= 1;
+      v4.y = model->vertices[vertexIndex0 * 3 + 1] + model->vertices[vertexIndex2 * 3 + 1];
+      v4.y >>= 1;
+      v4.z = model->vertices[vertexIndex0 * 3 + 2] + model->vertices[vertexIndex2 * 3 + 2];
+      v4.z >>= 1;
+      S3L_vec3Sub(&v4, scene.camera.transform.translation);
+      rotateVec3(&v4, sinYaw, cosYaw, sinPitch, cosPitch);
+      _S3L_mapProjectedVertexToScreen(&v4, scene.camera.focalLength);
+
+      v5.x = model->vertices[vertexIndex1 * 3] + model->vertices[vertexIndex2 * 3];
+      v5.x >>= 1;
+      v5.y = model->vertices[vertexIndex1 * 3 + 1] + model->vertices[vertexIndex2 * 3 + 1];
+      v5.y >>= 1;
+      v5.z = model->vertices[vertexIndex1 * 3 + 2] + model->vertices[vertexIndex2 * 3 + 2];
+      v5.z >>= 1;
+      S3L_vec3Sub(&v5, scene.camera.transform.translation);
+      rotateVec3(&v5, sinYaw, cosYaw, sinPitch, cosPitch);
+      _S3L_mapProjectedVertexToScreen(&v5, scene.camera.focalLength);
+
       azrp_triangle2(
-        v0.x, v0.y,
+        v3.x, v3.y,
         v1.x, v1.y,
-        v2.x, v2.y,
+        v5.x, v5.y,
         // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
         C_RED,
         ((uint8_t*) tileset.data) + (col.texIndex * 256),
-        palettes[col.palIndex]
+        palettes[col.palIndex],
+        8
       );
+
+      azrp_triangle2(
+        v5.x, v5.y,
+        v4.x, v4.y,
+        v3.x, v3.y,
+        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+        C_RED,
+        ((uint8_t*) tileset.data) + ((col.texIndex ^ 1) * 256) + (8 * 16 + 8),
+        palettes[col.palIndex],
+        8
+      );
+
+      azrp_triangle2(
+        v0.x, v0.y,
+        v3.x, v3.y,
+        v4.x, v4.y,
+        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+        C_RED,
+        ((uint8_t*) tileset.data) + (col.texIndex * 256) + (8 * 16 + 0),
+        palettes[col.palIndex],
+        8
+      );
+
+      azrp_triangle2(
+        v4.x, v4.y,
+        v5.x, v5.y,
+        v2.x, v2.y,
+        // v0.w > (S3L_F * 11) ? 0x86df : v0.w > (S3L_F * 8) ? alphaBlendRGB565(colours[triangleIndex], 0x86df, 31 - (v0.w - (S3L_F * 8)) / (S3L_F * 3 / 32)) : colours[triangleIndex]
+        C_RED,
+        ((uint8_t*) tileset.data) + (col.texIndex * 256) + (0 * 16 + 8),
+        palettes[col.palIndex],
+        8
+      );
+
+      extraTriCount += 3;
     }
+
+    // printf("%d extra triangles\n", extraTriCount);
 
     sortedIndex++;
   }
   #endif
+
+  if (particle.x != 0 || particle.y != 0 || particle.z != 0 || particle.w != 0) {
+    S3L_Vec4 pos = particle;
+    S3L_vec3Sub(&pos, scene.camera.transform.translation);
+    rotateVec3(&pos, sinYaw, cosYaw, sinPitch, cosPitch);
+    pos.w = pos.z;
+    _S3L_mapProjectedVertexToScreen(&pos, scene.camera.focalLength);
+
+    int size = 32 * S3L_F / pos.w;
+    printf("size: %d\n", size);
+
+    azrp_rect(pos.x - (size / 2), pos.y - (size / 2), size, size, C_BLUE);
+  }
 }
 
 void draw(void) {
@@ -369,6 +490,10 @@ void mainLoop(void) {
   clearevents();
   if (keydown(KEY_MENU)) {
     gint_osmenu();
+  }
+
+  if (keypressed(KEY_F6)) {
+    particle = toS3L_Vec4(mainPlayer->getPos());
   }
 
   // if (state[SDL_SCANCODE_ESCAPE])
@@ -637,10 +762,10 @@ void mainLoop(void) {
   u32 addtri = prof_time(perf_addtri);
   u32 other = total - (s3l_sort + sort + render + project + transform + checkvis + addtri);
 
-  drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
-  dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
-  dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
-  r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
+  // drect(0, DHEIGHT-40, DWIDTH-1, DHEIGHT-1, C_WHITE);
+  // dprint(4, 189, C_BLACK, "s1: %d, s2: %d, rend: %d, proj: %d", s3l_sort, sort, render, project);
+  // dprint(4, 209, C_BLACK, "t: %d, vis: %d, atri: %d, other: %d", transform, checkvis, addtri, other);
+  // r61524_display(gint_vram, DHEIGHT-40, 40, R61524_DMA_WAIT);
 
   // azrp_render_fragments();
   // azrp_clear_commands();

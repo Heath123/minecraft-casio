@@ -55,11 +55,37 @@ struct command {
    color_t* palette;
 };
 
+struct command2 {
+   uint8_t shader_id;
+   /* Local y coordinate of the first line in the fragment */
+   uint8_t y;
+   /* Number of lines to render total, including this fragment */
+   uint8_t height_total;
+   /* Number of lines to render on the current fragment */
+   uint8_t height_frag;
+   /* Rectangle along the x coordinates (x_max included) */
+   uint16_t x_min, x_max;
+   /* Color */
+   uint16_t color;
+   uint16_t _;
+
+   /* Initial barycentric coordinates */
+   int u0, v0, w0;
+   /* Variation of each coordinate for a movement in x */
+   int du_x, dv_x, dw_x;
+   /* Variation of each coordinate for a movement in y while canceling rows'
+      movements in x */
+   int du_row, dv_row, dw_row;
+
+   uint8_t* texture;
+   color_t* palette;
+};
+
 static int edge_start(int x1, int y1, int x2, int y2, int px, int py)
 {
     return (y2 - y1) * (px - x1) - (x2 - x1) * (py - y1);
 }
-void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, uint8_t* texture, color_t* palette)
+void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, uint8_t* texture, color_t* palette, int texSize)
 {
     prof_enter(azrp_perf_cmdgen);
 
@@ -107,7 +133,7 @@ void azrp_triangle2(int x1, int y1, int x2, int y2, int x3, int y3, int color, u
     if (edge_start(x1, y1, x2, y2, x3, y3) == 0) {
         norm_factor = 1;
     } else {
-        norm_factor = 65536 * 16 / edge_start(x1, y1, x2, y2, x3, y3);
+        norm_factor = 65536 * texSize / edge_start(x1, y1, x2, y2, x3, y3);
     }
 
     /* Vector products for barycentric coordinates */
